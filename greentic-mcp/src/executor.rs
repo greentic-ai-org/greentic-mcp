@@ -59,7 +59,14 @@ impl WasixExecutor {
                     let payload = serde_json::from_slice(&bytes).map_err(|err| {
                         McpError::ExecutionFailed(format!("invalid tool output JSON: {err}"))
                     })?;
-                    return Ok(ToolOutput { payload });
+                    let structured_content = match &payload {
+                        serde_json::Value::Object(map) => map.get("structuredContent").cloned(),
+                        _ => None,
+                    };
+                    return Ok(ToolOutput {
+                        payload,
+                        structured_content,
+                    });
                 }
                 Err(InvocationFailure::Transient(msg)) => {
                     if attempt + 1 >= attempts {

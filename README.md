@@ -102,6 +102,22 @@ toggles:
 The script will install a lightweight `pre-push` hook (if one is not already
 present) so future pushes automatically run the same checks.
 
+## Protocol revisions
+
+The client-side protocol helpers understand multiple MCP protocol revisions.
+`ProtocolRevision` defaults to `2025-06-18`; configs may optionally set
+`protocol_revision` (e.g., `"2025-03-26"`) per server. When unspecified, the
+latest revision is used while keeping message shapes compatible with older
+servers.
+
+Structured tool output is carried through as-is: `outputSchema` is preserved on
+tools, and tool call results may include `structuredContent` alongside plain
+content for richer responses.
+
+**Design note:** MCP transport (HTTP/JSON-RPC, protocol headers, batching,
+OAuth token injection) is handled in other Greentic components. This crate only
+models MCP message shapes and executes tools locally via WIT/wasm host calls.
+
 ## Releases & Publishing
 
 - Versions are taken directly from each crate's `Cargo.toml`.

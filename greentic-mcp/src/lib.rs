@@ -1,7 +1,9 @@
 //! Host-side ToolMap management and WASIX/WASI execution bridge for Greentic MCP tools.
 
+pub mod auth;
 pub mod config;
 pub mod executor;
+pub mod protocol;
 pub mod retry;
 pub mod tool_map;
 pub mod types;

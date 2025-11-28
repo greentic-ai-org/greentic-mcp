@@ -57,6 +57,12 @@ pub struct ToolInput {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ToolOutput {
     pub payload: Value,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "structuredContent"
+    )]
+    pub structured_content: Option<Value>,
 }
 
 /// Errors surfaced by the MCP executor.
@@ -92,5 +98,33 @@ impl McpError {
             name: name.into(),
             timeout,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn captures_structured_content_in_output() {
+        let value = json!({
+            "payload": {"message": "ok"},
+            "structuredContent": {"result": "structured"}
+        });
+
+        let output: ToolOutput = serde_json::from_value(value).expect("deserialize");
+        assert_eq!(
+            output
+                .structured_content
+                .as_ref()
+                .and_then(|v| v.get("result"))
+                .and_then(Value::as_str),
+            Some("structured")
+        );
+        assert_eq!(
+            output.payload.get("message").and_then(Value::as_str),
+            Some("ok")
+        );
     }
 }
