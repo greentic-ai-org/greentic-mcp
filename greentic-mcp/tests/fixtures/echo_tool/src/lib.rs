@@ -26,7 +26,7 @@ impl Guest for EchoTool {
 
         if value.get("flaky").and_then(Value::as_bool) == Some(true) {
             let attempt = FLAKY_ATTEMPTS.fetch_add(1, Ordering::SeqCst);
-            if attempt % 2 == 0 {
+            if attempt.is_multiple_of(2) {
                 panic!("flaky tool induced transient failure");
             }
         }

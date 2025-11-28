@@ -3,6 +3,7 @@ members = [
     "crates/mcp-exec",
     "crates/mcp-component",
     "greentic-mcp",
+    "greentic-mcp/tests/fixtures/echo_tool",
 ]
 resolver = "2"
 
@@ -10,7 +11,7 @@ resolver = "2"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/agentic/greentic-mcp"
-version = "0.4.0"
+version = "0.4.1"
 
 [workspace.dependencies]
 anyhow = "1.0"
@@ -22,8 +23,8 @@ sha2 = "0.10"
 thiserror = "2.0"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
 tracing = "0.1"
-wasmtime = { version = "38", default-features = false, features = ["async", "component-model", "cranelift", "runtime", "std"] }
-wasmtime-wasi = { version = "38", default-features = false, features = ["p2"] }
+wasmtime = { version = "39", default-features = false, features = ["async", "component-model", "cranelift", "runtime", "std"] }
+wasmtime-wasi = { version = "39", default-features = false, features = ["p2"] }
 tempfile = "3.23"
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "gzip", "brotli", "deflate", "rustls-tls"] }
 greentic-types = "0.4"
@@ -31,4 +32,5 @@ greentic-interfaces = { version = "0.4", default-features = false, features = ["
 indexmap = "2"
 rand = { version = "0.9", features = ["std"] }
 serde_yaml_bw = "2"
-mcp-exec = { version = "0.4.0", path = "crates/mcp-exec" }
+mcp-exec = { version = "0.4.1", path = "crates/mcp-exec" }
+wit-bindgen = { version = "0.48", features = ["macros"] }
