@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "crates/mcp-exec",
-    "crates/mcp-component",
+    "crates/mcp-adapter",
     "greentic-mcp",
     "greentic-mcp/tests/fixtures/echo_tool",
 ]
@@ -11,7 +11,7 @@ resolver = "2"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/agentic/greentic-mcp"
-version = "0.4.2"
+version = "0.4.3"
 
 [workspace.dependencies]
 anyhow = "1.0"
@@ -32,5 +32,5 @@ greentic-interfaces = { version = "0.4", default-features = false, features = ["
 indexmap = "2"
 rand = { version = "0.9", features = ["std"] }
 serde_yaml_bw = "2"
-mcp-exec = { version = "0.4.1", path = "crates/mcp-exec" }
+mcp-exec = { version = "0.4", path = "crates/mcp-exec" }
 wit-bindgen = { version = "0.48", features = ["macros"] }

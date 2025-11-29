@@ -11,7 +11,7 @@ plus placeholder crates for future component work.
 ```
 greentic-mcp/
 ├─ crates/
-│  ├─ mcp-component/    # Wasm component shell scaffold (placeholder)
+│  ├─ mcp-adapter/      # MCP adapter component template (wasix:mcp@25.06.18)
 │  └─ mcp-exec/         # executor library
 └─ Cargo.toml           # workspace manifest
 ```
@@ -64,11 +64,18 @@ Key features:
 - **Runner** – Spins up a Wasmtime component environment, registers the `runner-host-v1` imports from `greentic-interfaces`, and calls the tool's MCP `exec` export.
 - **Errors** – Structured error types map resolution, verification, and runtime failures to caller-friendly variants.
 
-### `mcp-component`
+### `mcp-adapter`
 
-Placeholder crate intended to host a reference Wasm component that exports the
-`wasix:mcp` interface. The current implementation is a stub so the crate can be
-expanded alongside the executor.
+Guest component template that:
+
+- Exports `greentic:component@0.4.0` and imports `wasix:mcp@25.06.18`.
+- Accepts JSON payloads of `{operation?, tool?, arguments?}`:
+  - Defaults to `list` when no tool is provided; defaults to `call` when a tool is present.
+  - Maps `list` → `list-tools`, `call` → `call-tool(tool, arguments)`.
+- Returns `{ok: true, result: ...}` envelopes with content/structured-content/meta and lightweight cards/messages for text/image/audio/resource(-link) blocks; elicitations surface as `{ok: true, elicitation: ...}`.
+- Errors use `{ok: false, error { code, message, status, tool, protocol, details }}` with codes `MCP_TOOL_ERROR`, `MCP_ROUTER_ERROR`, or `MCP_CONFIG_ERROR`.
+- Designed to be composed at pack-build time with a router component; the final merged artifact is the component flows should reference.
+- See `crates/mcp-adapter/README.md` for the detailed payload/response contract and composition notes.
 
 ### `greentic-types`
 

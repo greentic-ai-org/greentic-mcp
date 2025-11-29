@@ -1,0 +1,18 @@
+[package]
+name = "greentic-mcp-adapter"
+version.workspace = true
+edition = "2024"
+license = "MIT"
+publish = false
+description = "Guest MCP adapter template exporting greentic:component@0.4.0 and importing wasix:mcp@25.06.18"
+readme = "README.md"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+thiserror.workspace = true
+greentic-interfaces-guest = { version = "0.4.45", default-features = false, features = ["guest"] }
+wit-bindgen.workspace = true

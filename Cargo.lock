@@ -776,9 +776,9 @@ dependencies = [
 
 [[package]]
 name = "greentic-interfaces"
-version = "0.4.42"
+version = "0.4.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2e996535c3213d368f07576caaa296132cb870bb8eb585af9cc5c2ce2672003"
+checksum = "245ff6c51f73658298fe77847da66d384ecbaa45419426b8c32ad88d3371da32"
 dependencies = [
  "anyhow",
  "greentic-types",
@@ -791,8 +791,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "greentic-interfaces-guest"
+version = "0.4.47"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8c9e649026c1a2c46aab4c794f9d12998d270ffa13aad25601fb405543cbaf6c"
+dependencies = [
+ "greentic-types",
+ "wit-bindgen 0.48.1",
+ "wit-bindgen-core 0.48.1",
+ "wit-bindgen-rust 0.48.1",
+]
+
+[[package]]
 name = "greentic-mcp"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "anyhow",
  "greentic-interfaces",
@@ -812,10 +824,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "greentic-mcp-adapter"
+version = "0.4.3"
+dependencies = [
+ "greentic-interfaces-guest",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "wit-bindgen 0.48.1",
+]
+
+[[package]]
 name = "greentic-types"
-version = "0.4.10"
+version = "0.4.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf697b153b042da7ecc1666de13b853bfa73c803bde51976b77f90e12cfd4a5e"
+checksum = "b4ccf0dcc42157400a643b90e359f1b37e5a5f1f3f5887075eec7bc6ace34ba3"
 dependencies = [
  "chrono",
  "fnv",
@@ -1237,12 +1260,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4facc753ae494aeb6e3c22f839b158aebd4f9270f55cd3c79906c45476c47ab4"
 
 [[package]]
-name = "mcp-component"
-version = "0.4.2"
-
-[[package]]
 name = "mcp-exec"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "anyhow",
  "async-trait",
