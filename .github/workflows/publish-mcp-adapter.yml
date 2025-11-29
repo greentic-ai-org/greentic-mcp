@@ -2,6 +2,8 @@ name: Publish MCP Adapter
 
 on:
   push:
+    branches:
+      - master
     tags:
       - "v*"
 
