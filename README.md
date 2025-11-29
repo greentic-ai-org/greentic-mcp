@@ -132,6 +132,14 @@ models MCP message shapes and executes tools locally via WIT/wasm host calls.
 - The publish workflow then runs, linting and testing before calling `katyo/publish-crates@v2` to publish updated crates to crates.io.
 - Publishing is idempotent; if the specified version already exists, the workflow exits successfully without pushing anything new.
 
+### MCP adapter publishing
+
+- greentic-mcp builds and publishes the MCP adapter for `wasix:mcp@25.06.18` to GHCR:
+  - `ghcr.io/greentic-ai/greentic-mcp-adapter:25.06.18-v<adapter_version>`
+  - `ghcr.io/greentic-ai/greentic-mcp-adapter:25.06.18-stable` (moving pointer)
+- The pushed artifact is `mcp_adapter_25_06_18.component.wasm`, implementing `greentic:component@0.4.0` and importing `wasix:mcp@25.06.18`.
+- See `.github/workflows/publish-mcp-adapter.yml` and `scripts/build_adapter.sh` for the build/publish steps.
+
 ## Roadmap
 
 - Implement OCI and Warg resolvers, including signature verification.

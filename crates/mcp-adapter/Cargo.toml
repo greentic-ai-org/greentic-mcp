@@ -7,6 +7,10 @@ publish = false
 description = "Guest MCP adapter template exporting greentic:component@0.4.0 and importing wasix:mcp@25.06.18"
 readme = "README.md"
 
+[package.metadata.component]
+package = "greentic:mcp-adapter"
+world = "adapter"
+
 [lib]
 crate-type = ["cdylib", "rlib"]
 
