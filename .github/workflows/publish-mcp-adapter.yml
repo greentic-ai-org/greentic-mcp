@@ -26,8 +26,20 @@ jobs:
         with:
           targets: wasm32-wasip2
 
-      - name: Install wasm-tools
-        run: cargo install wasm-tools@1.224.0
+      - name: Install wasm-tools (binary)
+        run: |
+          set -euxo pipefail
+          VERSION="1.224.0"
+          ARCHIVE="wasm-tools-${VERSION}-x86_64-linux.tar.gz"
+          URL="https://github.com/bytecodealliance/wasm-tools/releases/download/v${VERSION}/${ARCHIVE}"
+          TMPDIR="$(mktemp -d)"
+          curl -sL "${URL}" -o "${TMPDIR}/${ARCHIVE}"
+          tar -xzf "${TMPDIR}/${ARCHIVE}" -C "${TMPDIR}"
+          BIN_PATH="$(find "${TMPDIR}" -type f -name wasm-tools -maxdepth 2 | head -n1)"
+          sudo mv "${BIN_PATH}" /usr/local/bin/wasm-tools
+          sudo chmod +x /usr/local/bin/wasm-tools
+          /usr/local/bin/wasm-tools --version
+          rm -rf "${TMPDIR}"
 
       - name: Build adapter component
         run: ./scripts/build_adapter.sh
