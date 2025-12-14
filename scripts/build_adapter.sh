@@ -2,7 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-OUT_DIR="$ROOT_DIR/target/wasm32-wasip2/release"
+ADAPTER_TARGET_DIR="${ROOT_DIR}/target/adapter-build"
+OUT_DIR="${ADAPTER_TARGET_DIR}/wasm32-wasip2/release"
 BIN_WASM="$OUT_DIR/greentic_mcp_adapter.wasm"
 COMP_WASM="$OUT_DIR/mcp_adapter_25_06_18.component.wasm"
 
@@ -37,10 +38,10 @@ PY
   fi
 
   echo "==> Generating greentic-interfaces bindings for host (bindings-rust)"
-  CARGO_TARGET_DIR="${ROOT_DIR}/target" "cargo" "+${ACTIVE_TOOLCHAIN}" build --locked --manifest-path "${iface_src}/Cargo.toml" >/dev/null
+  CARGO_TARGET_DIR="${ADAPTER_TARGET_DIR}" "cargo" "+${ACTIVE_TOOLCHAIN}" build --locked --manifest-path "${iface_src}/Cargo.toml" >/dev/null
 
   local candidate
-  candidate="$(ls -d "${ROOT_DIR}"/target/debug/build/greentic-interfaces-*/out/bindings 2>/dev/null | sort | tail -n1)"
+  candidate="$(ls -d "${ADAPTER_TARGET_DIR}"/debug/build/greentic-interfaces-*/out/bindings 2>/dev/null | sort | tail -n1)"
   if [ -z "${candidate}" ] || [ ! -d "${candidate}" ]; then
     echo "error: unable to locate generated greentic-interfaces bindings (set GREENTIC_INTERFACES_BINDINGS)" >&2
     exit 1
@@ -53,7 +54,7 @@ PY
 ensure_bindings
 
 echo "==> Building greentic-mcp-adapter (wasm32-wasip2, release)"
-"cargo" "+${ACTIVE_TOOLCHAIN}" build --release --locked --target wasm32-wasip2 -p greentic-mcp-adapter
+CARGO_TARGET_DIR="${ADAPTER_TARGET_DIR}" "cargo" "+${ACTIVE_TOOLCHAIN}" build --release --locked --target wasm32-wasip2 -p greentic-mcp-adapter
 
 echo "==> Component-izing adapter to ${COMP_WASM}"
 if ! wasm-tools component new "$BIN_WASM" -o "$COMP_WASM" 2>"/tmp/componentize.err.$$"; then
