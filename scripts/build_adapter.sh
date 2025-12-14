@@ -3,13 +3,28 @@ set -euo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ADAPTER_TARGET_DIR="${ROOT_DIR}/target/adapter-build"
-OUT_DIR="${ADAPTER_TARGET_DIR}/wasm32-wasip2/release"
-BIN_WASM="$OUT_DIR/greentic_mcp_adapter.wasm"
-COMP_WASM="$OUT_DIR/mcp_adapter_25_06_18.component.wasm"
+TARGET_TRIPLE="wasm32-wasip2"
+OUT_DIR=""
+BIN_WASM=""
+COMP_WASM=""
+
+if [ "${DEBUG:-0}" = "1" ]; then
+  set -x
+fi
 
 ACTIVE_TOOLCHAIN="$(rustup show active-toolchain | awk '{print $1}')"
+echo "==> rustup version: $(rustup --version)"
 echo "==> Ensuring wasm32-wasip2 target for toolchain ${ACTIVE_TOOLCHAIN}"
-rustup target add --toolchain "${ACTIVE_TOOLCHAIN}" wasm32-wasip2 >/dev/null 2>&1 || true
+if ! rustup target add --toolchain "${ACTIVE_TOOLCHAIN}" "${TARGET_TRIPLE}"; then
+  echo "error: failed to install target ${TARGET_TRIPLE} for ${ACTIVE_TOOLCHAIN}" >&2
+  echo "==> Available wasm targets for this toolchain:" >&2
+  rustup target list --toolchain "${ACTIVE_TOOLCHAIN}" | grep -E '^wasm32-' >&2 || true
+  exit 2
+fi
+
+OUT_DIR="${ADAPTER_TARGET_DIR}/${TARGET_TRIPLE}/release"
+BIN_WASM="$OUT_DIR/greentic_mcp_adapter.wasm"
+COMP_WASM="$OUT_DIR/mcp_adapter_25_06_18.component.wasm"
 
 ensure_bindings() {
   if [ -n "${GREENTIC_INTERFACES_BINDINGS:-}" ] && [ -d "${GREENTIC_INTERFACES_BINDINGS}" ]; then
@@ -38,7 +53,7 @@ PY
   fi
 
   echo "==> Generating greentic-interfaces bindings for host (bindings-rust)"
-  CARGO_TARGET_DIR="${ADAPTER_TARGET_DIR}" "cargo" "+${ACTIVE_TOOLCHAIN}" build --locked --manifest-path "${iface_src}/Cargo.toml" >/dev/null
+  CARGO_TARGET_DIR="${ADAPTER_TARGET_DIR}" "cargo" "+${ACTIVE_TOOLCHAIN}" build --locked --manifest-path "${iface_src}/Cargo.toml"
 
   local candidate
   candidate="$(ls -d "${ADAPTER_TARGET_DIR}"/debug/build/greentic-interfaces-*/out/bindings 2>/dev/null | sort | tail -n1)"
@@ -54,7 +69,8 @@ PY
 ensure_bindings
 
 echo "==> Building greentic-mcp-adapter (wasm32-wasip2, release)"
-CARGO_TARGET_DIR="${ADAPTER_TARGET_DIR}" "cargo" "+${ACTIVE_TOOLCHAIN}" build --release --locked --target wasm32-wasip2 -p greentic-mcp-adapter
+echo "==> Using target: ${TARGET_TRIPLE}"
+CARGO_TARGET_DIR="${ADAPTER_TARGET_DIR}" "cargo" "+${ACTIVE_TOOLCHAIN}" build --release --locked --target "${TARGET_TRIPLE}" -p greentic-mcp-adapter
 
 echo "==> Component-izing adapter to ${COMP_WASM}"
 if ! wasm-tools component new "$BIN_WASM" -o "$COMP_WASM" 2>"/tmp/componentize.err.$$"; then
