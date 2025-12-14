@@ -5,12 +5,13 @@
 mod config;
 pub mod describe;
 mod error;
+mod path_safety;
 mod resolve;
 mod runner;
 mod store;
 mod verify;
 
-pub use config::{ExecConfig, RuntimePolicy, VerifyPolicy};
+pub use config::{DynSecretsStore, ExecConfig, RuntimePolicy, SecretsStore, VerifyPolicy};
 pub use error::{ExecError, RunnerError};
 pub use store::{ToolInfo, ToolStore};
 
@@ -47,6 +48,7 @@ pub fn exec(req: ExecRequest, cfg: &ExecConfig) -> Result<Value, ExecError> {
         runner::ExecutionContext {
             runtime: &cfg.runtime,
             http_enabled: cfg.http_enabled,
+            secrets_store: cfg.secrets_store.clone(),
         },
     );
 
@@ -154,6 +156,7 @@ mod tests {
             },
             runtime: RuntimePolicy::default(),
             http_enabled: false,
+            secrets_store: None,
         };
 
         let req = ExecRequest {
@@ -175,6 +178,7 @@ mod tests {
                 runner::ExecutionContext {
                     runtime: &cfg.runtime,
                     http_enabled: cfg.http_enabled,
+                    secrets_store: cfg.secrets_store.clone(),
                 },
             )
             .expect("run");

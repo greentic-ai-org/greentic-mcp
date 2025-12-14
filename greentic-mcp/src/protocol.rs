@@ -1,3 +1,4 @@
+use greentic_types::{SecretKey, SecretRequirement};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -218,6 +219,14 @@ pub struct Tool {
         rename = "outputSchema"
     )]
     pub output_schema: Option<Value>,
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        rename = "secret_requirements",
+        alias = "secretRequirements",
+        deserialize_with = "deserialize_secret_requirements"
+    )]
+    pub secret_requirements: Vec<SecretRequirement>,
     #[serde(default, flatten)]
     pub extra: BTreeMap<String, Value>,
 }
@@ -257,6 +266,42 @@ pub struct InitializeParams {
     pub capabilities: BTreeMap<String, Value>,
     #[serde(default, flatten)]
     pub extra: BTreeMap<String, Value>,
+}
+
+fn deserialize_secret_requirements<'de, D>(
+    deserializer: D,
+) -> Result<Vec<SecretRequirement>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = serde_json::Value::deserialize(deserializer)?;
+    let arr = match value {
+        Value::Array(items) => items,
+        other => {
+            return Err(serde::de::Error::custom(format!(
+                "secret_requirements must be an array, got {other}"
+            )));
+        }
+    };
+
+    let mut out = Vec::with_capacity(arr.len());
+    for item in arr {
+        match item {
+            Value::String(key) => {
+                let mut req = SecretRequirement::default();
+                req.key = SecretKey::from(key.as_str());
+                out.push(req);
+            }
+            other => {
+                let req: SecretRequirement = serde_json::from_value(other).map_err(|err| {
+                    serde::de::Error::custom(format!("invalid secret requirement: {err}"))
+                })?;
+                out.push(req);
+            }
+        }
+    }
+
+    Ok(out)
 }
 
 /// Helper to build an initialize request with the correct revision string.
@@ -357,6 +402,7 @@ mod tests {
                     "description": "echo message",
                     "inputSchema": {"type": "object"},
                     "outputSchema": {"type": "string"},
+                    "secret_requirements": ["api-key"],
                     "x-extra": true
                 }
             ],
@@ -374,6 +420,8 @@ mod tests {
             Some("string")
         );
         assert!(tool.extra.contains_key("x-extra"));
+        assert_eq!(tool.secret_requirements.len(), 1);
+        assert_eq!(tool.secret_requirements[0].key.as_str(), "api-key");
         assert!(parsed.extra.contains_key("meta"));
 
         let call_json = json!({

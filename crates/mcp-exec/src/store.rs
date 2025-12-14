@@ -5,6 +5,8 @@ use std::time::Duration;
 use anyhow::{Context, Result, anyhow};
 use sha2::{Digest, Sha256};
 
+use crate::path_safety::normalize_under_root;
+
 #[derive(Clone, Debug)]
 pub enum ToolStore {
     /// Local directory populated with `.wasm` tool components.
@@ -77,7 +79,14 @@ fn list_local(root: &Path) -> Result<Vec<ToolInfo>> {
         return Ok(items);
     }
 
-    for entry in fs::read_dir(root).with_context(|| format!("listing {}", root.display()))? {
+    let canonical_root = root
+        .canonicalize()
+        .with_context(|| format!("canonicalizing tool store root {}", root.display()))?;
+    let display_root = root.to_path_buf();
+
+    for entry in fs::read_dir(&canonical_root)
+        .with_context(|| format!("listing {}", canonical_root.display()))?
+    {
         let entry = entry?;
         let path = entry.path();
 
@@ -100,10 +109,20 @@ fn list_local(root: &Path) -> Result<Vec<ToolInfo>> {
             continue;
         };
 
-        let sha = compute_sha256(&path).ok();
+        let relative = path.strip_prefix(&canonical_root).with_context(|| {
+            format!(
+                "entry {} not under {}",
+                path.display(),
+                canonical_root.display()
+            )
+        })?;
+        let safe_path = normalize_under_root(&canonical_root, relative)?;
+        let stable_path = display_root.join(relative);
+
+        let sha = compute_sha256(&safe_path).ok();
         items.push(ToolInfo {
             name,
-            path: path.clone(),
+            path: stable_path,
             sha256: sha,
         });
     }
@@ -128,8 +147,12 @@ fn fetch_http(expected: &str, url: &str, cache_dir: &Path, name: &str) -> Result
     fs::create_dir_all(cache_dir)
         .with_context(|| format!("creating cache dir {}", cache_dir.display()))?;
 
+    let cache_dir = cache_dir
+        .canonicalize()
+        .with_context(|| format!("canonicalizing cache dir {}", cache_dir.display()))?;
+
     let filename = format!("{expected}.wasm");
-    let dest_path = cache_dir.join(filename);
+    let dest_path = normalize_under_root(&cache_dir, Path::new(&filename))?;
 
     if !dest_path.exists() {
         download_with_retry(url, &dest_path)?;

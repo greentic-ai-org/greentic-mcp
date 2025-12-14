@@ -3,8 +3,12 @@
 The long-term contract for Greentic MCP tools is the component world described
 in [`greentic-interfaces`](https://docs.rs/greentic-interfaces). Hosts can call
 the generated bindings to invoke the `component-api::invoke` function, fulfill
-the `runner-host-v1` imports (HTTP/secrets/KV), and query `describe-json` so
+the `runner-host-v1` imports (HTTP/KV), and query `describe-json` so
 schema/default metadata stays bundled with each component.
+
+Secrets are exposed only through the `greentic:secrets/store@1.0.0` bytes API.
+Legacy `secret_get` host imports are removed; callers must wire a secrets-store
+binding that applies runtime TenantCtx/session scope when resolving names.
 
 Until every tool is published with those bindings, the executor supports a
 lightweight Preview2 component ABI that trades in UTF-8 JSON strings instead of

@@ -20,6 +20,7 @@ fn online_weather_list_and_describe() {
         security: Default::default(),
         runtime: Default::default(),
         http_enabled: true,
+        secrets_store: None,
     };
 
     let tools = match cfg.store.list() {
@@ -47,6 +48,7 @@ fn online_weather_list_and_describe() {
         capabilities,
         secrets,
         config_schema,
+        secret_requirements,
     } = describe;
 
     if let Some(doc) = describe_v1 {
@@ -77,4 +79,10 @@ fn online_weather_list_and_describe() {
     if let Maybe::Data(schema) = config_schema {
         assert!(schema.is_object());
     }
+    assert!(
+        !secret_requirements
+            .iter()
+            .any(|req| req.key.as_str().is_empty()),
+        "secret requirements should not be empty"
+    );
 }

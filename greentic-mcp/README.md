@@ -15,9 +15,12 @@ export the `greentic:component/component@1.0.0` world, the bridge calls
 `describe-json` to fetch the node schema/defaults that live with the tool
 component rather than mirroring them in this repository.
 
-Runtime callbacks (HTTP, secrets, KV) are satisfied through the
-`runner-host-v1` helpers shipped by `greentic-interfaces`, which keeps the host
-implementation aligned with the latest Greentic runner contracts.
+Runtime callbacks (HTTP + KV) are satisfied through the `runner-host-v1`
+helpers shipped by `greentic-interfaces`, which keeps the host implementation
+aligned with the latest Greentic runner contracts. Secrets must travel through
+the `greentic:secrets/store@1.0.0` bytes API (no env/host-import fallback); the
+legacy `secret_get` hook is removed and callers should provide a store binding
+that enforces runtime TenantCtx scope.
 
 ## Tool map configuration
 
@@ -64,3 +67,14 @@ See [ABI.md](ABI.md) for the exact contract implemented by the integration
 tests. When a tool exports the richer Greentic component API, use the bindings
 from `greentic-interfaces` to avoid manual JSON marshalling and to work with
 the `describe-v1`/`runner-host-v1` WIT worlds directly.
+
+## Secret requirements
+
+`describe_tool` now normalizes any secret descriptors in tool metadata to
+`Vec<SecretRequirement>`:
+
+- Prefer `secret_requirements` returned by `describe-json`.
+- Fall back to legacy `list_secrets` payloads and emit a warning.
+- Keys validated via `greentic-types`; unknown formats default to `text`.
+- Default scope uses the runtime sentinel `{ env: "runtime", tenant: "runtime" }`
+  so TenantCtx/session identity can override at execution time.

@@ -1,5 +1,7 @@
 use anyhow::{Context, Result};
+use greentic_types::{SecretFormat, SecretKey, SecretRequirement, SecretScope};
 use serde_json::Value;
+use tracing::warn;
 
 use crate::{ExecConfig, ExecError, ExecRequest, exec};
 
@@ -20,17 +22,27 @@ pub struct ToolDescribe {
     pub capabilities: Maybe<Vec<String>>,
     pub secrets: Maybe<Value>,
     pub config_schema: Maybe<Value>,
+    pub secret_requirements: Vec<SecretRequirement>,
 }
 
 pub fn describe_tool(name: &str, cfg: &ExecConfig) -> Result<ToolDescribe> {
     #[cfg(feature = "describe-v1")]
     {
         if let Some(document) = try_describe_v1(name, cfg)? {
+            let (secret_requirements, used_legacy) =
+                secret_requirements(Some(&document), &Maybe::Unsupported);
+            if used_legacy {
+                warn!(
+                    tool = name,
+                    "legacy secrets descriptors were mapped; emit `secret_requirements` in describe-json"
+                );
+            }
             return Ok(ToolDescribe {
                 describe_v1: Some(document),
                 capabilities: Maybe::Unsupported,
                 secrets: Maybe::Unsupported,
                 config_schema: Maybe::Unsupported,
+                secret_requirements,
             });
         }
     }
@@ -73,11 +85,20 @@ pub fn describe_tool(name: &str, cfg: &ExecConfig) -> Result<ToolDescribe> {
         Maybe::Unsupported => Maybe::Unsupported,
     };
 
+    let (secret_requirements, used_legacy) = secret_requirements(None, &secrets);
+    if used_legacy {
+        warn!(
+            tool = name,
+            "legacy secrets descriptors were mapped; emit `secret_requirements` in tool metadata"
+        );
+    }
+
     Ok(ToolDescribe {
         describe_v1: None,
         capabilities,
         secrets,
         config_schema,
+        secret_requirements,
     })
 }
 
@@ -130,4 +151,208 @@ fn try_describe_v1(name: &str, cfg: &ExecConfig) -> Result<Option<Value>> {
     let value: Value =
         serde_json::from_str(&raw).with_context(|| "describe-json returned invalid JSON")?;
     Ok(Some(value))
+}
+
+pub const RUNTIME_SENTINEL: &str = "runtime";
+
+fn secret_requirements(
+    describe_v1: Option<&Value>,
+    secrets: &Maybe<Value>,
+) -> (Vec<SecretRequirement>, bool) {
+    if let Some(requirements) = describe_v1.and_then(|doc| doc.get("secret_requirements")) {
+        let parsed = normalize_requirements(requirements);
+        return (dedup(parsed), false);
+    }
+
+    if let Maybe::Data(value) = secrets {
+        let parsed = normalize_requirements(value);
+        return (dedup(parsed), true);
+    }
+
+    (Vec::new(), matches!(secrets, Maybe::Data(_)))
+}
+
+fn normalize_requirements(value: &Value) -> Vec<SecretRequirement> {
+    if let Some(arr) = value.as_array() {
+        return arr.iter().filter_map(parse_requirement).collect();
+    }
+
+    if let Some(obj) = value.as_object() {
+        if let Some(reqs) = obj.get("secret_requirements").and_then(Value::as_array) {
+            return reqs.iter().filter_map(parse_requirement).collect();
+        }
+        if let Some(reqs) = obj.get("secrets").and_then(Value::as_array) {
+            return reqs.iter().filter_map(parse_requirement).collect();
+        }
+    }
+
+    Vec::new()
+}
+
+fn parse_requirement(value: &Value) -> Option<SecretRequirement> {
+    match value {
+        Value::String(key) => {
+            let key = SecretKey::new(key).ok()?;
+            let mut req = SecretRequirement::default();
+            req.key = key;
+            req.required = true;
+            req.scope = Some(runtime_scope());
+            req.format = Some(default_format());
+            Some(req)
+        }
+        Value::Object(obj) => {
+            let key_raw = obj
+                .get("key")
+                .or_else(|| obj.get("name"))
+                .and_then(Value::as_str)?;
+            let key = SecretKey::new(key_raw).ok()?;
+            let required = obj
+                .get("required")
+                .and_then(Value::as_bool)
+                .unwrap_or_else(|| {
+                    !obj.get("optional")
+                        .and_then(Value::as_bool)
+                        .unwrap_or(false)
+                });
+
+            let scope = parse_scope(obj.get("scope"))
+                .or_else(|| parse_scope(Some(&Value::Object(obj.clone()))))
+                .unwrap_or_else(runtime_scope);
+
+            let format = obj
+                .get("format")
+                .and_then(Value::as_str)
+                .and_then(parse_format)
+                .unwrap_or_else(default_format);
+
+            let description = obj
+                .get("description")
+                .and_then(Value::as_str)
+                .map(ToOwned::to_owned);
+
+            let schema = obj.get("schema").cloned();
+            let examples = obj
+                .get("examples")
+                .and_then(Value::as_array)
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(example_to_string)
+                        .collect::<Vec<String>>()
+                })
+                .unwrap_or_default();
+
+            let mut req = SecretRequirement::default();
+            req.key = key;
+            req.required = required;
+            req.description = description;
+            req.scope = Some(scope);
+            req.format = Some(format);
+            req.schema = schema;
+            req.examples = examples;
+            Some(req)
+        }
+        _ => None,
+    }
+}
+
+fn parse_scope(value: Option<&Value>) -> Option<SecretScope> {
+    let obj = value?.as_object()?;
+    let env = obj.get("env").and_then(Value::as_str)?;
+    let tenant = obj.get("tenant").and_then(Value::as_str)?;
+    let team = obj
+        .get("team")
+        .and_then(Value::as_str)
+        .map(ToOwned::to_owned);
+
+    SecretScope::new(env, tenant, team).ok()
+}
+
+fn parse_format(value: &str) -> Option<SecretFormat> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "json" => Some(SecretFormat::Json),
+        "text" => Some(SecretFormat::Text),
+        "opaque" => Some(SecretFormat::Opaque),
+        "binary" | "bytes" | "byte" | "bin" => Some(SecretFormat::Binary),
+        _ => None,
+    }
+}
+
+fn runtime_scope() -> SecretScope {
+    SecretScope::new(RUNTIME_SENTINEL, RUNTIME_SENTINEL, None)
+        .expect("sentinel scope should be valid")
+}
+
+fn default_format() -> SecretFormat {
+    SecretFormat::Text
+}
+
+fn example_to_string(value: &Value) -> Option<String> {
+    match value {
+        Value::String(s) => Some(s.clone()),
+        other => serde_json::to_string(other).ok(),
+    }
+}
+
+fn dedup(requirements: Vec<SecretRequirement>) -> Vec<SecretRequirement> {
+    use std::collections::HashSet;
+
+    let mut seen = HashSet::new();
+    let mut out = Vec::with_capacity(requirements.len());
+    for req in requirements {
+        let scope_key = req.scope.clone();
+        if seen.insert((req.key.clone(), scope_key)) {
+            out.push(req);
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn maps_describe_v1_secret_requirements() {
+        let describe_v1 = json!({
+            "name": "demo",
+            "secret_requirements": [
+                {
+                    "key": "api-key",
+                    "required": false,
+                    "format": "json",
+                    "scope": { "env": "dev", "tenant": "acme" },
+                    "description": "auth key"
+                }
+            ]
+        });
+
+        let (reqs, used_legacy) = secret_requirements(Some(&describe_v1), &Maybe::Unsupported);
+        assert!(!used_legacy);
+        assert_eq!(reqs.len(), 1);
+        let req = &reqs[0];
+        assert_eq!(req.key.as_str(), "api-key");
+        assert!(!req.required);
+        assert_eq!(req.format, Some(SecretFormat::Json));
+        let scope = req.scope.as_ref().expect("scope set");
+        assert_eq!(scope.env(), "dev");
+        assert_eq!(scope.tenant(), "acme");
+        assert_eq!(req.description.as_deref(), Some("auth key"));
+    }
+
+    #[test]
+    fn maps_legacy_list_secrets_strings() {
+        let secrets = Maybe::Data(json!(["token", "secondary"]));
+        let (reqs, used_legacy) = secret_requirements(None, &secrets);
+        assert!(used_legacy);
+        assert_eq!(reqs.len(), 2);
+
+        for req in reqs {
+            assert!(req.required);
+            assert_eq!(req.format, Some(SecretFormat::Text));
+            let scope = req.scope.as_ref().expect("scope set");
+            assert_eq!(scope.env(), RUNTIME_SENTINEL);
+            assert_eq!(scope.tenant(), RUNTIME_SENTINEL);
+        }
+    }
 }

@@ -5,17 +5,19 @@ use std::thread;
 use std::time::Instant;
 
 use greentic_interfaces::runner_host_v1::{self as runner_host, RunnerHost};
+use greentic_types::TenantCtx;
 use serde_json::Value;
 use wasmtime::component::{Component, Linker};
 use wasmtime::{Engine, Store};
 
 use crate::ExecRequest;
-use crate::config::RuntimePolicy;
+use crate::config::{DynSecretsStore, RuntimePolicy};
 use crate::error::RunnerError;
 use crate::verify::VerifiedArtifact;
 pub struct ExecutionContext<'a> {
     pub runtime: &'a RuntimePolicy,
     pub http_enabled: bool,
+    pub secrets_store: Option<DynSecretsStore>,
 }
 
 pub trait Runner: Send + Sync {
@@ -58,11 +60,19 @@ impl Runner for DefaultRunner {
         let artifact = artifact.clone();
         let runtime = ctx.runtime.clone();
         let http_enabled = ctx.http_enabled;
+        let secrets_store = ctx.secrets_store.clone();
         let timeout_duration = runtime.per_call_timeout;
 
         let (tx, rx) = mpsc::channel();
         thread::spawn(move || {
-            let res = run_sync(engine, request, artifact, runtime, http_enabled);
+            let res = run_sync(
+                engine,
+                request,
+                artifact,
+                runtime,
+                http_enabled,
+                secrets_store,
+            );
             let _ = tx.send(res);
         });
 
@@ -84,6 +94,7 @@ fn run_sync(
     artifact: VerifiedArtifact,
     runtime: RuntimePolicy,
     http_enabled: bool,
+    secrets_store: Option<DynSecretsStore>,
 ) -> Result<Value, RunnerError> {
     let component = match Component::from_binary(&engine, artifact.resolved.bytes.as_ref()) {
         Ok(component) => component,
@@ -99,8 +110,12 @@ fn run_sync(
     linker.allow_shadowing(true);
     runner_host::add_to_linker(&mut linker, |state: &mut StoreState| state)
         .map_err(RunnerError::from)?;
+    add_secrets_to_linker(&mut linker)?;
 
-    let mut store = Store::new(&engine, StoreState::new(http_enabled));
+    let mut store = Store::new(
+        &engine,
+        StoreState::new(http_enabled, secrets_store, request.tenant.clone()),
+    );
 
     let instance = linker.instantiate(&mut store, &component)?;
     let exec = instance.get_typed_func::<(String, String), (String,)>(&mut store, "exec")?;
@@ -134,13 +149,21 @@ fn run_sync(
 struct StoreState {
     http_enabled: bool,
     http_client: Option<reqwest::blocking::Client>,
+    secrets_store: Option<DynSecretsStore>,
+    tenant: Option<TenantCtx>,
 }
 
 impl StoreState {
-    fn new(http_enabled: bool) -> Self {
+    fn new(
+        http_enabled: bool,
+        secrets_store: Option<DynSecretsStore>,
+        tenant: Option<greentic_types::TenantCtx>,
+    ) -> Self {
         Self {
             http_enabled,
             http_client: None,
+            secrets_store,
+            tenant,
         }
     }
 
@@ -161,6 +184,51 @@ impl StoreState {
         }
 
         Ok(self.http_client.as_ref().expect("client initialized"))
+    }
+
+    fn secrets_read(&self, name: String) -> Result<Vec<u8>, String> {
+        let store = self
+            .secrets_store
+            .as_ref()
+            .ok_or_else(|| HostError::unavailable("no secrets store configured").to_wire_error())?;
+        let tenant = self
+            .tenant
+            .as_ref()
+            .ok_or_else(|| HostError::missing_ctx().to_wire_error())?;
+        store
+            .read(tenant, &name)
+            .map_err(HostError::from)
+            .map_err(|err| err.to_wire_error())
+    }
+
+    fn secrets_write(&self, name: String, bytes: Vec<u8>) -> Result<(), String> {
+        let store = self
+            .secrets_store
+            .as_ref()
+            .ok_or_else(|| HostError::unavailable("no secrets store configured").to_wire_error())?;
+        let tenant = self
+            .tenant
+            .as_ref()
+            .ok_or_else(|| HostError::missing_ctx().to_wire_error())?;
+        store
+            .write(tenant, &name, &bytes)
+            .map_err(HostError::from)
+            .map_err(|err| err.to_wire_error())
+    }
+
+    fn secrets_delete(&self, name: String) -> Result<(), String> {
+        let store = self
+            .secrets_store
+            .as_ref()
+            .ok_or_else(|| HostError::unavailable("no secrets store configured").to_wire_error())?;
+        let tenant = self
+            .tenant
+            .as_ref()
+            .ok_or_else(|| HostError::missing_ctx().to_wire_error())?;
+        store
+            .delete(tenant, &name)
+            .map_err(HostError::from)
+            .map_err(|err| err.to_wire_error())
     }
 }
 
@@ -213,10 +281,6 @@ impl RunnerHost for StoreState {
         }
     }
 
-    fn secret_get(&mut self, _name: String) -> wasmtime::Result<Result<String, String>> {
-        Ok(Err("secrets-disabled".into()))
-    }
-
     fn kv_get(&mut self, _ns: String, _key: String) -> wasmtime::Result<Option<String>> {
         Ok(None)
     }
@@ -246,6 +310,67 @@ fn apply_headers(
     Ok(builder)
 }
 
+fn add_secrets_to_linker(linker: &mut Linker<StoreState>) -> wasmtime::Result<()> {
+    let mut secrets = linker.instance("greentic:secrets/secret-store@1.0.0")?;
+    secrets.func_wrap(
+        "read",
+        |mut caller: wasmtime::StoreContextMut<'_, StoreState>, (name,): (String,)| {
+            Ok((caller.data_mut().secrets_read(name),))
+        },
+    )?;
+    secrets.func_wrap(
+        "write",
+        |mut caller: wasmtime::StoreContextMut<'_, StoreState>,
+         (name, bytes): (String, Vec<u8>)| {
+            Ok((caller.data_mut().secrets_write(name, bytes),))
+        },
+    )?;
+    secrets.func_wrap(
+        "delete",
+        |mut caller: wasmtime::StoreContextMut<'_, StoreState>, (name,): (String,)| {
+            Ok((caller.data_mut().secrets_delete(name),))
+        },
+    )?;
+    Ok(())
+}
+
+#[derive(Clone, Debug)]
+struct HostError {
+    code: String,
+    message: String,
+}
+
+impl HostError {
+    fn unavailable(message: &str) -> Self {
+        Self {
+            code: "secrets-unavailable".into(),
+            message: message.to_string(),
+        }
+    }
+
+    fn missing_ctx() -> Self {
+        Self {
+            code: "missing-tenant-ctx".into(),
+            message: "tenant context is required to access secrets".into(),
+        }
+    }
+}
+
+impl From<String> for HostError {
+    fn from(message: String) -> Self {
+        Self {
+            code: "secrets-error".into(),
+            message,
+        }
+    }
+}
+
+impl HostError {
+    fn to_wire_error(&self) -> String {
+        format!("{}:{}", self.code, self.message)
+    }
+}
+
 fn try_mock_json(bytes: &[u8], action: &str) -> Option<Result<Value, RunnerError>> {
     let text = std::str::from_utf8(bytes).ok()?;
     let root: Value = serde_json::from_str(text).ok()?;
@@ -270,9 +395,28 @@ fn try_mock_json(bytes: &[u8], action: &str) -> Option<Result<Value, RunnerError
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::SecretsStore;
+    use greentic_types::{EnvId, TenantCtx, TenantId};
+    use std::sync::{Arc, Mutex};
+
+    #[derive(Default)]
+    struct MockSecretsStore {
+        last: Mutex<Option<(String, String)>>,
+    }
+
+    impl SecretsStore for MockSecretsStore {
+        fn read(&self, scope: &TenantCtx, name: &str) -> Result<Vec<u8>, String> {
+            self.last
+                .lock()
+                .unwrap()
+                .replace((scope.env.as_str().to_string(), name.to_string()));
+            Ok(b"ok".to_vec())
+        }
+    }
+
     #[test]
     fn http_request_requires_flag() {
-        let mut state = StoreState::new(false);
+        let mut state = StoreState::new(false, None, None);
         let result = state
             .http_request("GET".into(), "https://example.com".into(), Vec::new(), None)
             .expect("request should run");
@@ -281,7 +425,7 @@ mod tests {
 
     #[test]
     fn http_request_rejects_invalid_method() {
-        let mut state = StoreState::new(true);
+        let mut state = StoreState::new(true, None, None);
         let result = state
             .http_request("???".into(), "https://example.com".into(), Vec::new(), None)
             .expect("request should run");
@@ -289,11 +433,27 @@ mod tests {
     }
 
     #[test]
-    fn secret_get_is_disabled() {
-        let mut state = StoreState::new(true);
-        let result = state
-            .secret_get("api-key".into())
-            .expect("call should succeed");
-        assert!(matches!(result, Err(err) if err == "secrets-disabled"));
+    fn secrets_read_fails_without_store() {
+        let tenant = TenantCtx::new(EnvId("dev".into()), TenantId("acme".into()));
+        let state = StoreState::new(true, None, Some(tenant));
+        let err = state
+            .secrets_read("api-key".into())
+            .expect_err("should fail");
+        assert!(
+            err.starts_with("secrets-unavailable"),
+            "expected code in error string, got {err}"
+        );
+    }
+
+    #[test]
+    fn secrets_read_uses_scope() {
+        let store = Arc::new(MockSecretsStore::default());
+        let tenant = TenantCtx::new(EnvId("dev".into()), TenantId("acme".into()));
+        let state = StoreState::new(true, Some(store.clone()), Some(tenant));
+        let bytes = state.secrets_read("api-key".into()).expect("read ok");
+        assert_eq!(bytes, b"ok");
+        let last = store.last.lock().unwrap().clone().expect("called");
+        assert_eq!(last.0, "dev");
+        assert_eq!(last.1, "api-key");
     }
 }

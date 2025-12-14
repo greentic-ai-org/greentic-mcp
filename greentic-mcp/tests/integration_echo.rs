@@ -20,6 +20,7 @@ fn test_exec_config(runtime: RuntimePolicy) -> (ExecConfig, tempfile::TempDir) {
         security: VerifyPolicy::default(),
         runtime,
         http_enabled: false,
+        secrets_store: None,
     };
     (cfg, dir)
 }

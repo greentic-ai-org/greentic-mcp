@@ -19,6 +19,7 @@ fn offline_mock_describe_and_list() {
         },
         runtime: Default::default(),
         http_enabled: false,
+        secrets_store: None,
     };
 
     let tools = cfg.store.list().unwrap();

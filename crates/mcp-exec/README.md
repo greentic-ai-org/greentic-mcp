@@ -44,6 +44,7 @@ let cfg = ExecConfig {
     security: VerifyPolicy::default(),
     runtime: RuntimePolicy::default(),
     http_enabled: true,
+    secrets_store: None,
 };
 
 let output = mcp_exec::exec(
