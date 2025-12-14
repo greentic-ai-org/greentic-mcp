@@ -55,8 +55,13 @@ ensure_bindings() {
     return
   fi
 
+  if [ ! -f Cargo.lock ]; then
+    echo "error: Cargo.lock not found; run cargo generate-lockfile or build once before running this script" >&2
+    exit 1
+  fi
+
   local iface_version iface_src
-  iface_version="$(python3 - <<'PY' || true
+  iface_version="$(python3 - <<'PY'
 import tomllib
 from pathlib import Path
 lock = Path('Cargo.lock')
@@ -69,7 +74,17 @@ PY
     exit 1
   fi
 
-  iface_src="$(ls -d "${CARGO_HOME:-$HOME/.cargo}"/registry/src/*/greentic-interfaces-"${iface_version}" 2>/dev/null | head -n1)"
+  local registry_root="${CARGO_HOME:-$HOME/.cargo}/registry/src"
+  echo "==> greentic-interfaces version (from Cargo.lock): ${iface_version}"
+  echo "==> cargo registry root: ${registry_root}"
+
+  # Ensure the crate is available locally.
+  cargo fetch --locked
+
+  shopt -s nullglob
+  local matches=( "${registry_root}"/*/greentic-interfaces-"${iface_version}" )
+  shopt -u nullglob
+  iface_src="${matches[0]:-}"
   if [ -z "${iface_src}" ]; then
     echo "error: unable to locate greentic-interfaces-${iface_version} in cargo registry" >&2
     exit 1
