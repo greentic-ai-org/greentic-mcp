@@ -48,6 +48,7 @@ echo "==> wasm32-wasip2 target confirmed; continuing"
 OUT_DIR="${ADAPTER_TARGET_DIR}/${TARGET_TRIPLE}/release"
 BIN_WASM="$OUT_DIR/greentic_mcp_adapter.wasm"
 COMP_WASM="$OUT_DIR/mcp_adapter_25_06_18.component.wasm"
+LEGACY_OUT_DIR="${ROOT_DIR}/target/${TARGET_TRIPLE}/release"
 
 ensure_bindings() {
   if [ -n "${GREENTIC_INTERFACES_BINDINGS:-}" ] && [ -d "${GREENTIC_INTERFACES_BINDINGS}" ]; then
@@ -130,5 +131,12 @@ VERSION="$(cargo metadata --format-version 1 --no-deps \
 echo "Built adapter:"
 echo "  wasm:      ${BIN_WASM}"
 echo "  component: ${COMP_WASM}"
+if [ -d "${LEGACY_OUT_DIR}" ] || mkdir -p "${LEGACY_OUT_DIR}"; then
+  cp "${BIN_WASM}" "${LEGACY_OUT_DIR}/" 2>/dev/null || true
+  cp "${COMP_WASM}" "${LEGACY_OUT_DIR}/" 2>/dev/null || true
+  echo "Legacy copies:"
+  echo "  wasm:      ${LEGACY_OUT_DIR}/$(basename "${BIN_WASM}")"
+  echo "  component: ${LEGACY_OUT_DIR}/$(basename "${COMP_WASM}")"
+fi
 echo "Intended OCI ref:"
 echo "  ghcr.io/greentic-ai/greentic-mcp-adapter:25.06.18-v${VERSION}"
