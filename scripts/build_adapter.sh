@@ -14,13 +14,30 @@ fi
 
 ACTIVE_TOOLCHAIN="$(rustup show active-toolchain | awk '{print $1}')"
 echo "==> rustup version: $(rustup --version)"
+echo "==> rustc version:  $(rustc -V || true)"
 echo "==> Ensuring wasm32-wasip2 target for toolchain ${ACTIVE_TOOLCHAIN}"
-if ! rustup target add --toolchain "${ACTIVE_TOOLCHAIN}" "${TARGET_TRIPLE}"; then
-  echo "error: failed to install target ${TARGET_TRIPLE} for ${ACTIVE_TOOLCHAIN}" >&2
-  echo "==> Available wasm targets for this toolchain:" >&2
-  rustup target list --toolchain "${ACTIVE_TOOLCHAIN}" | grep -E '^wasm32-' >&2 || true
-  exit 2
+
+set +e
+rustup target add --toolchain "${ACTIVE_TOOLCHAIN}" "${TARGET_TRIPLE}"
+status=$?
+set -e
+
+echo "==> rustup target add exit code: ${status}"
+echo "==> rustup target list (installed):"
+rustup target list --toolchain "${ACTIVE_TOOLCHAIN}" --installed || true
+
+if [ "${status}" -ne 0 ]; then
+  if rustup target list --toolchain "${ACTIVE_TOOLCHAIN}" --installed | grep -q "^${TARGET_TRIPLE}\$"; then
+    echo "warn: rustup returned ${status}, but ${TARGET_TRIPLE} is installed; continuing" >&2
+  else
+    echo "error: rustup target add ${TARGET_TRIPLE} failed (exit ${status})" >&2
+    echo "==> Available wasm targets for this toolchain:" >&2
+    rustup target list --toolchain "${ACTIVE_TOOLCHAIN}" | grep -E '^wasm32-' >&2 || true
+    exit "${status}"
+  fi
 fi
+
+echo "==> wasm32-wasip2 target confirmed; continuing"
 
 OUT_DIR="${ADAPTER_TARGET_DIR}/${TARGET_TRIPLE}/release"
 BIN_WASM="$OUT_DIR/greentic_mcp_adapter.wasm"
