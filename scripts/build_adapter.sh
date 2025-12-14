@@ -10,6 +10,48 @@ ACTIVE_TOOLCHAIN="$(rustup show active-toolchain | awk '{print $1}')"
 echo "==> Ensuring wasm32-wasip2 target for toolchain ${ACTIVE_TOOLCHAIN}"
 rustup target add --toolchain "${ACTIVE_TOOLCHAIN}" wasm32-wasip2 >/dev/null 2>&1 || true
 
+ensure_bindings() {
+  if [ -n "${GREENTIC_INTERFACES_BINDINGS:-}" ] && [ -d "${GREENTIC_INTERFACES_BINDINGS}" ]; then
+    echo "==> Using GREENTIC_INTERFACES_BINDINGS=${GREENTIC_INTERFACES_BINDINGS}"
+    return
+  fi
+
+  local iface_version iface_src
+  iface_version="$(python3 - <<'PY' || true
+import tomllib
+from pathlib import Path
+lock = Path('Cargo.lock')
+data = tomllib.loads(lock.read_text())
+print(next(p['version'] for p in data['package'] if p['name']=='greentic-interfaces'))
+PY
+)"
+  if [ -z "${iface_version}" ]; then
+    echo "error: unable to discover greentic-interfaces version from Cargo.lock" >&2
+    exit 1
+  fi
+
+  iface_src="$(ls -d "${CARGO_HOME:-$HOME/.cargo}"/registry/src/*/greentic-interfaces-"${iface_version}" 2>/dev/null | head -n1)"
+  if [ -z "${iface_src}" ]; then
+    echo "error: unable to locate greentic-interfaces-${iface_version} in cargo registry" >&2
+    exit 1
+  fi
+
+  echo "==> Generating greentic-interfaces bindings for host (bindings-rust)"
+  CARGO_TARGET_DIR="${ROOT_DIR}/target" "cargo" "+${ACTIVE_TOOLCHAIN}" build --locked --manifest-path "${iface_src}/Cargo.toml" >/dev/null
+
+  local candidate
+  candidate="$(ls -d "${ROOT_DIR}"/target/debug/build/greentic-interfaces-*/out/bindings 2>/dev/null | sort | tail -n1)"
+  if [ -z "${candidate}" ] || [ ! -d "${candidate}" ]; then
+    echo "error: unable to locate generated greentic-interfaces bindings (set GREENTIC_INTERFACES_BINDINGS)" >&2
+    exit 1
+  fi
+
+  export GREENTIC_INTERFACES_BINDINGS="${candidate}"
+  echo "==> Using GREENTIC_INTERFACES_BINDINGS=${GREENTIC_INTERFACES_BINDINGS}"
+}
+
+ensure_bindings
+
 echo "==> Building greentic-mcp-adapter (wasm32-wasip2, release)"
 "cargo" "+${ACTIVE_TOOLCHAIN}" build --release --locked --target wasm32-wasip2 -p greentic-mcp-adapter
 
