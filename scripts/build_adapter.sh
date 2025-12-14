@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [ "${DEBUG:-0}" = "1" ]; then
+  set -x
+fi
+
+trap 'echo "error: failed at line $LINENO: $BASH_COMMAND" >&2' ERR
+
 ROOT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ADAPTER_TARGET_DIR="${ROOT_DIR}/target/adapter-build"
 TARGET_TRIPLE="wasm32-wasip2"
@@ -83,13 +89,14 @@ PY
   echo "==> Using GREENTIC_INTERFACES_BINDINGS=${GREENTIC_INTERFACES_BINDINGS}"
 }
 
+echo "==> Step: ensure_bindings"
 ensure_bindings
 
-echo "==> Building greentic-mcp-adapter (wasm32-wasip2, release)"
+echo "==> Step: build adapter crate"
 echo "==> Using target: ${TARGET_TRIPLE}"
 CARGO_TARGET_DIR="${ADAPTER_TARGET_DIR}" "cargo" "+${ACTIVE_TOOLCHAIN}" build --release --locked --target "${TARGET_TRIPLE}" -p greentic-mcp-adapter
 
-echo "==> Component-izing adapter to ${COMP_WASM}"
+echo "==> Step: componentize"
 if ! wasm-tools component new "$BIN_WASM" -o "$COMP_WASM" 2>"/tmp/componentize.err.$$"; then
   if grep -q "decoding a component is not supported" "/tmp/componentize.err.$$"; then
     # Already a component; just copy it.
