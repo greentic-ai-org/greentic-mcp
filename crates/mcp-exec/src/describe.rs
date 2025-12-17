@@ -264,22 +264,29 @@ fn parse_scope(value: Option<&Value>) -> Option<SecretScope> {
         .and_then(Value::as_str)
         .map(ToOwned::to_owned);
 
-    SecretScope::new(env, tenant, team).ok()
+    Some(SecretScope {
+        env: env.to_owned(),
+        tenant: tenant.to_owned(),
+        team,
+    })
 }
 
 fn parse_format(value: &str) -> Option<SecretFormat> {
     match value.trim().to_ascii_lowercase().as_str() {
         "json" => Some(SecretFormat::Json),
         "text" => Some(SecretFormat::Text),
-        "opaque" => Some(SecretFormat::Opaque),
-        "binary" | "bytes" | "byte" | "bin" => Some(SecretFormat::Binary),
+        "opaque" => Some(SecretFormat::Bytes),
+        "binary" | "bytes" | "byte" | "bin" => Some(SecretFormat::Bytes),
         _ => None,
     }
 }
 
 fn runtime_scope() -> SecretScope {
-    SecretScope::new(RUNTIME_SENTINEL, RUNTIME_SENTINEL, None)
-        .expect("sentinel scope should be valid")
+    SecretScope {
+        env: RUNTIME_SENTINEL.to_owned(),
+        tenant: RUNTIME_SENTINEL.to_owned(),
+        team: None,
+    }
 }
 
 fn default_format() -> SecretFormat {
@@ -299,7 +306,10 @@ fn dedup(requirements: Vec<SecretRequirement>) -> Vec<SecretRequirement> {
     let mut seen = HashSet::new();
     let mut out = Vec::with_capacity(requirements.len());
     for req in requirements {
-        let scope_key = req.scope.clone();
+        let scope_key = req
+            .scope
+            .as_ref()
+            .map(|scope| (scope.env.clone(), scope.tenant.clone(), scope.team.clone()));
         if seen.insert((req.key.clone(), scope_key)) {
             out.push(req);
         }
@@ -335,8 +345,8 @@ mod tests {
         assert!(!req.required);
         assert_eq!(req.format, Some(SecretFormat::Json));
         let scope = req.scope.as_ref().expect("scope set");
-        assert_eq!(scope.env(), "dev");
-        assert_eq!(scope.tenant(), "acme");
+        assert_eq!(scope.env, "dev");
+        assert_eq!(scope.tenant, "acme");
         assert_eq!(req.description.as_deref(), Some("auth key"));
     }
 
@@ -351,8 +361,8 @@ mod tests {
             assert!(req.required);
             assert_eq!(req.format, Some(SecretFormat::Text));
             let scope = req.scope.as_ref().expect("scope set");
-            assert_eq!(scope.env(), RUNTIME_SENTINEL);
-            assert_eq!(scope.tenant(), RUNTIME_SENTINEL);
+            assert_eq!(scope.env, RUNTIME_SENTINEL);
+            assert_eq!(scope.tenant, RUNTIME_SENTINEL);
         }
     }
 }
