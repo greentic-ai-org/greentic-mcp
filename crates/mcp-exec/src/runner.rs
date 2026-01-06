@@ -9,6 +9,10 @@ use greentic_types::TenantCtx;
 use serde_json::Value;
 use wasmtime::component::{Component, Linker};
 use wasmtime::{Engine, Store};
+use wasmtime_wasi::{
+    ResourceTable, WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView,
+    p2::add_to_linker_sync as add_wasi_to_linker,
+};
 
 use crate::ExecRequest;
 use crate::config::{DynSecretsStore, RuntimePolicy};
@@ -108,6 +112,7 @@ fn run_sync(
 
     let mut linker = Linker::new(&engine);
     linker.allow_shadowing(true);
+    add_wasi_to_linker(&mut linker).map_err(|err| RunnerError::Internal(err.to_string()))?;
     runner_host::add_to_linker(&mut linker, |state: &mut StoreState| state)
         .map_err(RunnerError::from)?;
     add_secrets_to_linker(&mut linker)?;
@@ -151,7 +156,13 @@ struct StoreState {
     http_client: Option<reqwest::blocking::Client>,
     secrets_store: Option<DynSecretsStore>,
     tenant: Option<TenantCtx>,
+    table: ResourceTable,
+    wasi_ctx: WasiCtx,
 }
+
+// The Wasmtime store is confined to a single worker thread for each execution.
+unsafe impl Send for StoreState {}
+unsafe impl Sync for StoreState {}
 
 impl StoreState {
     fn new(
@@ -159,11 +170,14 @@ impl StoreState {
         secrets_store: Option<DynSecretsStore>,
         tenant: Option<greentic_types::TenantCtx>,
     ) -> Self {
+        let wasi_ctx = WasiCtxBuilder::new().inherit_stdio().inherit_env().build();
         Self {
             http_enabled,
             http_client: None,
             secrets_store,
             tenant,
+            table: ResourceTable::new(),
+            wasi_ctx,
         }
     }
 
@@ -290,6 +304,15 @@ impl RunnerHost for StoreState {
     }
 }
 
+impl WasiView for StoreState {
+    fn ctx(&mut self) -> WasiCtxView<'_> {
+        WasiCtxView {
+            ctx: &mut self.wasi_ctx,
+            table: &mut self.table,
+        }
+    }
+}
+
 fn apply_headers(
     mut builder: reqwest::blocking::RequestBuilder,
     headers: &[String],
@@ -395,9 +418,10 @@ fn try_mock_json(bytes: &[u8], action: &str) -> Option<Result<Value, RunnerError
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::SecretsStore;
+    use crate::config::{RuntimePolicy, SecretsStore};
     use greentic_types::{EnvId, TenantCtx, TenantId};
     use std::sync::{Arc, Mutex};
+    use wasmtime::component::Component;
 
     #[derive(Default)]
     struct MockSecretsStore {
@@ -455,5 +479,32 @@ mod tests {
         let last = store.last.lock().unwrap().clone().expect("called");
         assert_eq!(last.0, "dev");
         assert_eq!(last.1, "api-key");
+    }
+
+    #[test]
+    fn links_preview2_wasi_imports() {
+        let wasm = wat::parse_str(
+            r#"(component
+                (import "wasi:clocks/monotonic-clock@0.2.0" (instance
+                  (export "now" (func (result u64)))
+                )))"#,
+        )
+        .expect("wat should parse");
+
+        let runner = DefaultRunner::new(&RuntimePolicy::default()).expect("runner config");
+        let engine = runner.engine.clone();
+        let component = Component::from_binary(&engine, &wasm).expect("component should compile");
+
+        let mut linker = Linker::new(&engine);
+        linker.allow_shadowing(true);
+        add_wasi_to_linker(&mut linker).expect("add preview2 imports");
+        runner_host::add_to_linker(&mut linker, |state: &mut StoreState| state)
+            .expect("runner host linking");
+        add_secrets_to_linker(&mut linker).expect("secrets linking");
+
+        let mut store = Store::new(&engine, StoreState::new(false, None, None));
+        linker
+            .instantiate(&mut store, &component)
+            .expect("instantiate with preview2 imports");
     }
 }

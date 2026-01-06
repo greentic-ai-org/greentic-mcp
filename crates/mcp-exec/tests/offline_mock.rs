@@ -1,5 +1,5 @@
-use mcp_exec::describe::{Maybe, describe_tool};
-use mcp_exec::{ExecConfig, ToolStore, VerifyPolicy};
+use greentic_mcp_exec::describe::{Maybe, describe_tool};
+use greentic_mcp_exec::{ExecConfig, ToolStore, VerifyPolicy};
 use std::path::PathBuf;
 
 #[test]

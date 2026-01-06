@@ -13,7 +13,7 @@ pub use executor::WasixExecutor;
 pub use tool_map::ToolMap;
 pub use types::{McpError, ToolInput, ToolMapConfig, ToolOutput, ToolRef};
 
-use mcp_exec::{ExecConfig, ExecError, ExecRequest, RunnerError};
+use greentic_mcp_exec::{ExecConfig, ExecError, ExecRequest, RunnerError};
 use serde_json::{Value, json};
 use std::sync::Arc;
 use tokio::time::sleep;
@@ -45,7 +45,7 @@ use std::time::Duration;
 type ExecFn = dyn Fn(ExecRequest, &ExecConfig) -> Result<Value, ExecError> + Send + Sync;
 
 pub async fn exec_with_retries(req: ExecRequest, cfg: &ExecConfig) -> Result<Value, ExecError> {
-    exec_with_retries_with(req, cfg, Arc::new(mcp_exec::exec)).await
+    exec_with_retries_with(req, cfg, Arc::new(greentic_mcp_exec::exec)).await
 }
 
 pub async fn exec_with_retries_backend<F>(

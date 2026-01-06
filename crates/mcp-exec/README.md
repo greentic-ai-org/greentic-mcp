@@ -1,4 +1,4 @@
-# mcp-exec
+# greentic-mcp-exec
 
 Greentic's executor for Wasm tools that implement the `wasix:mcp` interface.
 The crate handles lookup, verification, and execution of MCP-compatible
@@ -16,7 +16,7 @@ HTTP fetch.
 
 ```rust
 use greentic_types::{EnvId, TenantCtx, TenantId};
-use mcp_exec::{ExecConfig, ExecRequest, RuntimePolicy, ToolStore, VerifyPolicy};
+use greentic_mcp_exec::{ExecConfig, ExecRequest, RuntimePolicy, ToolStore, VerifyPolicy};
 use serde_json::json;
 
 let tenant = TenantCtx {
@@ -47,7 +47,7 @@ let cfg = ExecConfig {
     secrets_store: None,
 };
 
-let output = mcp_exec::exec(
+let output = greentic_mcp_exec::exec(
     ExecRequest {
         component: "weather_api".into(),
         action: "forecast_weather".into(),
@@ -70,5 +70,5 @@ Set `RUN_ONLINE_TESTS=1` to exercise the live weather integration test that
 retrieves the published Wasm component over HTTPS.
 
 MCP node schemas live with the component crate itself. When a tool exports
-`describe-json`, `mcp-exec` forwards that blob upstream so flows can validate
+`describe-json`, `greentic-mcp-exec` forwards that blob upstream so flows can validate
 against the component-owned schema/defaults instead of mirroring JSON locally.

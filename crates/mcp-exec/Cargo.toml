@@ -1,11 +1,11 @@
 [package]
-name = "mcp-exec"
+name = "greentic-mcp-exec"
 version.workspace = true
 edition = "2024"
 license = "MIT"
 description = "Greentic executor for running wasix:mcp-compatible WebAssembly components with policy-driven verification and sandboxing."
 repository = "https://github.com/agentic/greentic-mcp"
-documentation = "https://docs.rs/mcp-exec"
+documentation = "https://docs.rs/greentic-mcp-exec"
 readme = "README.md"
 keywords = ["greentic", "wasm", "executor", "mcp"]
 categories = ["wasm"]
@@ -33,3 +33,4 @@ runner-host-v1 = ["greentic-interfaces/runner-host-v1"]
 
 [dev-dependencies]
 tempfile.workspace = true
+wat = "1"

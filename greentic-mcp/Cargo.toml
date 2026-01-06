@@ -27,7 +27,7 @@ wasmtime.workspace = true
 wasmtime-wasi.workspace = true
 greentic-types.workspace = true
 greentic-interfaces.workspace = true
-mcp-exec = { workspace = true }
+greentic-mcp-exec = { workspace = true }
 
 [dev-dependencies]
 tempfile.workspace = true

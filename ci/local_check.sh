@@ -149,7 +149,7 @@ run_cmd "cargo build --locked --features describe-v1,runner-host-v1" cargo build
 run_cmd "cargo test --locked --features describe-v1,runner-host-v1" cargo test --locked --features "describe-v1,runner-host-v1"
 
 if [[ "$ONLINE" == "1" ]]; then
-  run_cmd "Online tests (mcp-exec::online_weather)" env RUN_ONLINE_TESTS=1 cargo test -p mcp-exec --test online_weather -- --nocapture
+  run_cmd "Online tests (greentic-mcp-exec::online_weather)" env RUN_ONLINE_TESTS=1 cargo test -p greentic-mcp-exec --test online_weather -- --nocapture
 else
   run_or_skip "Online tests (set LOCAL_CHECK_ONLINE=1 to enable)" false
 fi

@@ -1,5 +1,5 @@
 use greentic_mcp::{TestBackend, exec_test_backend, exec_with_retries_backend};
-use mcp_exec::{ExecConfig, ExecRequest, RuntimePolicy, ToolStore, VerifyPolicy};
+use greentic_mcp_exec::{ExecConfig, ExecRequest, RuntimePolicy, ToolStore, VerifyPolicy};
 use serde_json::json;
 use std::time::Duration;
 use tempfile::tempdir;
@@ -48,8 +48,8 @@ async fn echo_timeout() {
     .expect_err("should timeout");
 
     match err {
-        mcp_exec::ExecError::Runner { source, .. } => match source {
-            mcp_exec::RunnerError::Timeout { .. } => {}
+        greentic_mcp_exec::ExecError::Runner { source, .. } => match source {
+            greentic_mcp_exec::RunnerError::Timeout { .. } => {}
             other => panic!("expected timeout error, got {other:?}"),
         },
         other => panic!("expected runner timeout, got {other:?}"),

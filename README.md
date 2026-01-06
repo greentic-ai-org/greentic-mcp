@@ -2,7 +2,7 @@
 
 Executor and component tooling for the Greentic platform targeting the
 `wasix:mcp` interface. The workspace currently provides a reusable Rust
-library (`mcp-exec`) that can load Wasm components, verify their provenance,
+library (`greentic-mcp-exec`) that can load Wasm components, verify their provenance,
 wire in the Greentic host imports, and execute the exported MCP entrypoint,
 plus placeholder crates for future component work.
 
@@ -12,17 +12,17 @@ plus placeholder crates for future component work.
 greentic-mcp/
 ├─ crates/
 │  ├─ mcp-adapter/      # MCP adapter component template (wasix:mcp@25.06.18)
-│  └─ mcp-exec/         # executor library
+│  └─ mcp-exec/         # executor library (package: greentic-mcp-exec)
 └─ Cargo.toml           # workspace manifest
 ```
 
-### `mcp-exec`
+### `greentic-mcp-exec`
 
 Public API:
 
 ```rust
 use greentic_types::{EnvId, TenantCtx, TenantId};
-use mcp_exec::{ExecConfig, ExecRequest, RuntimePolicy, ToolStore, VerifyPolicy};
+use greentic_mcp_exec::{ExecConfig, ExecRequest, RuntimePolicy, ToolStore, VerifyPolicy};
 use serde_json::json;
 use std::path::PathBuf;
 
@@ -46,7 +46,7 @@ let cfg = ExecConfig {
     secrets_store: None,
 };
 
-let result = mcp_exec::exec(
+let result = greentic_mcp_exec::exec(
     ExecRequest {
         component: "weather_api".into(),
         action: "forecast_weather".into(),
@@ -93,7 +93,7 @@ rustup target add wasm32-wasip2
 cargo fmt
 cargo clippy --all-targets -- -D warnings
 cargo test
-RUN_ONLINE_TESTS=1 cargo test -p mcp-exec --test online_weather
+RUN_ONLINE_TESTS=1 cargo test -p greentic-mcp-exec --test online_weather
 ```
 
 The online weather integration test is skipped unless `RUN_ONLINE_TESTS=1` is set.

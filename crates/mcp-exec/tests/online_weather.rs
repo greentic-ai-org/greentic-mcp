@@ -1,5 +1,5 @@
-use mcp_exec::describe::{Maybe, describe_tool};
-use mcp_exec::{ExecConfig, ToolStore};
+use greentic_mcp_exec::describe::{Maybe, describe_tool};
+use greentic_mcp_exec::{ExecConfig, ToolStore};
 
 #[test]
 fn online_weather_list_and_describe() {
@@ -43,7 +43,7 @@ fn online_weather_list_and_describe() {
         }
     };
 
-    let mcp_exec::describe::ToolDescribe {
+    let greentic_mcp_exec::describe::ToolDescribe {
         describe_v1,
         capabilities,
         secrets,
