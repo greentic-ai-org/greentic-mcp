@@ -42,4 +42,4 @@ jobs:
         with:
           toolchain: 1.91.0
       - name: Run online integration tests
-        run: cargo test -p mcp-exec --test online_weather -- --nocapture
+        run: cargo test -p greentic-mcp-exec --test online_weather -- --nocapture
