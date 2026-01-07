@@ -17,6 +17,7 @@ use wasmtime_wasi::{
 use crate::ExecRequest;
 use crate::config::{DynSecretsStore, RuntimePolicy};
 use crate::error::RunnerError;
+use crate::router::try_call_tool_router;
 use crate::verify::VerifiedArtifact;
 pub struct ExecutionContext<'a> {
     pub runtime: &'a RuntimePolicy,
@@ -122,10 +123,20 @@ fn run_sync(
         StoreState::new(http_enabled, secrets_store, request.tenant.clone()),
     );
 
+    let args_json = serde_json::to_string(&request.args)?;
+    if let Some(value) = try_call_tool_router(
+        &component,
+        &mut linker,
+        &mut store,
+        &request.action,
+        &args_json,
+    )? {
+        return Ok(value);
+    }
+
     let instance = linker.instantiate(&mut store, &component)?;
     let exec = instance.get_typed_func::<(String, String), (String,)>(&mut store, "exec")?;
 
-    let args_json = serde_json::to_string(&request.args)?;
     let started = Instant::now();
     let (raw_response,) = match exec.call(&mut store, (request.action.clone(), args_json)) {
         Ok(result) => result,
@@ -151,7 +162,7 @@ fn run_sync(
     Ok(value)
 }
 
-struct StoreState {
+pub(crate) struct StoreState {
     http_enabled: bool,
     http_client: Option<reqwest::blocking::Client>,
     secrets_store: Option<DynSecretsStore>,

@@ -3,7 +3,8 @@
 Greentic's executor for Wasm tools that implement the `wasix:mcp` interface.
 The crate handles lookup, verification, and execution of MCP-compatible
 components while exposing host capabilities such as secrets, telemetry, and
-HTTP fetch.
+HTTP fetch. Supports MCP router-world components (`wasix:mcp/router@25.06.18`)
+as well as legacy `exec` shims.
 
 ## Features
 

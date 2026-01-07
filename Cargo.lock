@@ -910,7 +910,7 @@ dependencies = [
 
 [[package]]
 name = "greentic-mcp"
-version = "0.4.11"
+version = "0.4.12"
 dependencies = [
  "anyhow",
  "greentic-interfaces",
@@ -931,7 +931,7 @@ dependencies = [
 
 [[package]]
 name = "greentic-mcp-adapter"
-version = "0.4.11"
+version = "0.4.12"
 dependencies = [
  "greentic-interfaces-guest",
  "serde",
@@ -942,10 +942,11 @@ dependencies = [
 
 [[package]]
 name = "greentic-mcp-exec"
-version = "0.4.11"
+version = "0.4.12"
 dependencies = [
  "anyhow",
  "async-trait",
+ "base64",
  "greentic-interfaces",
  "greentic-types",
  "hex",
@@ -1375,6 +1376,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09edd9e8b54e49e587e4f6295a7d29c3ea94d469cb40ab8ca70b288248a81db2"
 
 [[package]]
+name = "legacy-exec"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "wit-bindgen 0.50.0",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.179"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1797,6 +1806,15 @@ dependencies = [
  "libc",
  "untrusted",
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "router-echo"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "wit-bindgen 0.50.0",
 ]
 
 [[package]]

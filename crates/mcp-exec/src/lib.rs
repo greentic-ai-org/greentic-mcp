@@ -7,6 +7,7 @@ pub mod describe;
 mod error;
 mod path_safety;
 mod resolve;
+mod router;
 mod runner;
 mod store;
 mod verify;

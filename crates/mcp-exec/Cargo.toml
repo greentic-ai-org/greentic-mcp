@@ -25,6 +25,7 @@ wasmtime-wasi.workspace = true
 greentic-types.workspace = true
 greentic-interfaces.workspace = true
 reqwest.workspace = true
+base64 = "0.22"
 
 [features]
 default = ["describe-v1", "runner-host-v1"]
