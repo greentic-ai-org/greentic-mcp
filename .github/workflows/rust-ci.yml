@@ -8,6 +8,9 @@ on:
   schedule:
     - cron: "17 2 * * *"
 
+permissions:
+  contents: read
+
 jobs:
   offline:
     runs-on: ubuntu-latest
