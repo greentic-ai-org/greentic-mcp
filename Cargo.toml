@@ -13,7 +13,7 @@ resolver = "2"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/agentic/greentic-mcp"
-version = "0.4.12"
+version = "0.4.13"
 
 [workspace.dependencies]
 anyhow = "1.0"
