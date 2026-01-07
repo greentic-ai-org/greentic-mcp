@@ -36,9 +36,28 @@ jobs:
         with:
           toolchain: 1.91.0
       - uses: Swatinem/rust-cache@v2
+      - name: Check crates.io versions (skip if already published)
+        id: check
+        run: |
+          set -euo pipefail
+          crates=("greentic-mcp-exec" "greentic-mcp")
+          publish=false
+          metadata=$(cargo metadata --format-version 1 --no-deps)
+          for crate in "${crates[@]}"; do
+            local_ver=$(printf '%s' "$metadata" | jq -r '.packages[] | select(.name=="'"$crate"'") | .version')
+            remote_ver=$(curl -sSf "https://crates.io/api/v1/crates/${crate}" | jq -r '.crate.max_version // ""')
+            if [ "$local_ver" != "$remote_ver" ]; then
+              publish=true
+              echo "needs_${crate//=/_}=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "needs_${crate//=/_}=false" >> "$GITHUB_OUTPUT"
+            fi
+          done
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
 
       # Idempotent crates.io publish: only publishes when versions changed.
       - name: Publish changed crates
+        if: steps.check.outputs.publish == 'true'
         uses: katyo/publish-crates@v2
         with:
           path: .
