@@ -43,9 +43,16 @@ jobs:
           crates=("greentic-mcp-exec" "greentic-mcp")
           publish=false
           metadata=$(cargo metadata --format-version 1 --no-deps)
+          ua="greentic-publish-check/1.0 (github-actions)"
           for crate in "${crates[@]}"; do
             local_ver=$(printf '%s' "$metadata" | jq -r '.packages[] | select(.name=="'"$crate"'") | .version')
-            remote_ver=$(curl -sSf "https://crates.io/api/v1/crates/${crate}" | jq -r '.crate.max_version // ""')
+            resp=$(curl -s -H "User-Agent: ${ua}" -w "%{http_code}" -o /tmp/crate.json "https://crates.io/api/v1/crates/${crate}" || true)
+            if [ "$resp" = "200" ]; then
+              remote_ver=$(jq -r '.crate.max_version // ""' /tmp/crate.json)
+            else
+              echo "crates.io lookup for ${crate} failed with HTTP ${resp}; assuming not published"
+              remote_ver=""
+            fi
             if [ "$local_ver" != "$remote_ver" ]; then
               publish=true
               echo "needs_${crate//=/_}=true" >> "$GITHUB_OUTPUT"
