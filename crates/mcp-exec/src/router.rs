@@ -6,7 +6,7 @@ use crate::runner::StoreState;
 
 mod bindings {
     wasmtime::component::bindgen!({
-        path: "../mcp-adapter/wit/deps/wasix-mcp-25.6.18",
+        path: "wit/wasix-mcp-25.6.18",
         world: "mcp-router",
     });
 }

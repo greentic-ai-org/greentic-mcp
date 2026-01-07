@@ -9,6 +9,7 @@ documentation = "https://docs.rs/greentic-mcp-exec"
 readme = "README.md"
 keywords = ["greentic", "wasm", "executor", "mcp"]
 categories = ["wasm"]
+include = ["src/**", "tests/**", "README.md", "Cargo.toml", "wit/**"]
 
 [dependencies]
 anyhow.workspace = true
