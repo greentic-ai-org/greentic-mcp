@@ -1,6 +1,6 @@
 mod bindings {
     wit_bindgen::generate!({
-        path: "../../wit/wasix-mcp-25.6.18",
+        path: "wit/wasix-mcp-25.6.18",
         world: "mcp-router",
         generate_all,
         generate_unused_types: true,
