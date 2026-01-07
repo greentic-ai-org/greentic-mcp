@@ -12,7 +12,7 @@ mod bindings {
 }
 
 use bindings::McpRouter;
-use bindings::exports::wasix::mcp::router::{ContentBlock, Response, ToolError, ToolResult};
+use bindings::exports::wasix::mcp::router::{ContentBlock, Response, Tool, ToolError, ToolResult};
 
 pub fn try_call_tool_router(
     component: &wasmtime::component::Component,
@@ -42,6 +42,27 @@ pub fn try_call_tool_router(
     };
 
     Ok(Some(render_response(&response)))
+}
+
+#[allow(dead_code)]
+pub fn try_list_tools_router(
+    component: &wasmtime::component::Component,
+    linker: &mut Linker<StoreState>,
+    store: &mut wasmtime::Store<StoreState>,
+) -> anyhow::Result<Option<Vec<Tool>>> {
+    let router = match McpRouter::instantiate(&mut *store, component, linker) {
+        Ok(router) => router,
+        Err(err) => {
+            let msg = err.to_string();
+            if msg.contains("unknown export") || msg.contains("No such export") {
+                return Ok(None);
+            }
+            return Err(err);
+        }
+    };
+
+    let tools = router.wasix_mcp_router().call_list_tools(&mut *store)?;
+    Ok(Some(tools))
 }
 
 fn render_response(response: &Response) -> Value {

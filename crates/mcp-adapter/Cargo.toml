@@ -20,3 +20,6 @@ serde_json.workspace = true
 thiserror.workspace = true
 greentic-interfaces-guest.workspace = true
 wit-bindgen.workspace = true
+
+[dev-dependencies]
+wasmtime.workspace = true
