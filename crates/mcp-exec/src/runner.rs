@@ -162,7 +162,7 @@ fn run_sync(
     Ok(value)
 }
 
-pub(crate) struct StoreState {
+pub struct StoreState {
     http_enabled: bool,
     http_client: Option<reqwest::blocking::Client>,
     secrets_store: Option<DynSecretsStore>,
@@ -176,7 +176,7 @@ unsafe impl Send for StoreState {}
 unsafe impl Sync for StoreState {}
 
 impl StoreState {
-    fn new(
+    pub fn new(
         http_enabled: bool,
         secrets_store: Option<DynSecretsStore>,
         tenant: Option<greentic_types::TenantCtx>,
@@ -344,7 +344,7 @@ fn apply_headers(
     Ok(builder)
 }
 
-fn add_secrets_to_linker(linker: &mut Linker<StoreState>) -> wasmtime::Result<()> {
+pub fn add_secrets_to_linker(linker: &mut Linker<StoreState>) -> wasmtime::Result<()> {
     let mut secrets = linker.instance("greentic:secrets/secret-store@1.0.0")?;
     secrets.func_wrap(
         "read",

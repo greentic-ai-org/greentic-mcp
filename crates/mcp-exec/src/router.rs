@@ -11,10 +11,12 @@ mod bindings {
     });
 }
 
-use bindings::McpRouter;
-use bindings::exports::wasix::mcp::router::{ContentBlock, Response, Tool, ToolError, ToolResult};
+pub use bindings::McpRouter;
+pub use bindings::exports::wasix::mcp::router::{
+    ContentBlock, Response, Tool, ToolError, ToolResult,
+};
 
-pub fn try_call_tool_router(
+pub(crate) fn try_call_tool_router(
     component: &wasmtime::component::Component,
     linker: &mut Linker<StoreState>,
     store: &mut wasmtime::Store<StoreState>,
@@ -45,7 +47,7 @@ pub fn try_call_tool_router(
 }
 
 #[allow(dead_code)]
-pub fn try_list_tools_router(
+pub(crate) fn try_list_tools_router(
     component: &wasmtime::component::Component,
     linker: &mut Linker<StoreState>,
     store: &mut wasmtime::Store<StoreState>,
@@ -65,7 +67,7 @@ pub fn try_list_tools_router(
     Ok(Some(tools))
 }
 
-fn render_response(response: &Response) -> Value {
+pub fn render_response(response: &Response) -> Value {
     match response {
         Response::Completed(result) => render_tool_result(result),
         Response::Elicit(req) => serde_json::json!({
@@ -122,7 +124,7 @@ fn render_content_block(block: &ContentBlock) -> (Value, Option<Value>) {
     }
 }
 
-fn tool_error_to_value(tool: &str, err: ToolError) -> Value {
+pub fn tool_error_to_value(tool: &str, err: ToolError) -> Value {
     let (code, status, message) = match err {
         ToolError::InvalidParameters(msg) => ("MCP_TOOL_ERROR", 400, msg),
         ToolError::ExecutionError(msg) => ("MCP_TOOL_ERROR", 500, msg),
