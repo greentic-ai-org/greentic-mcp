@@ -98,6 +98,21 @@ RUN_ONLINE_TESTS=1 cargo test -p greentic-mcp-exec --test online_weather
 
 The online weather integration test is skipped unless `RUN_ONLINE_TESTS=1` is set.
 
+For faster local MCP runs, prefer the release build and enable the Wasmtime cache:
+
+```bash
+cargo run -p greentic-mcp-exec --release -- router --router /path/to/component.wasm --list-tools
+
+cat > /tmp/wasmtime-cache.toml <<'EOF'
+[cache]
+enabled = true
+directory = "/tmp/wasmtime-cache"
+EOF
+
+WASMTIME_CACHE_CONFIG=/tmp/wasmtime-cache.toml \
+cargo run -p greentic-mcp-exec --release -- router --router /path/to/component.wasm --list-tools
+```
+
 ## Local checks
 
 Run `ci/local_check.sh` before pushing to mirror the CI matrix locally. Helpful

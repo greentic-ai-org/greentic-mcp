@@ -110,4 +110,4 @@ impl Guest for Router {
 }
 
 #[cfg(target_arch = "wasm32")]
-bindings::export!(Router);
+bindings::export!(Router with_types_in bindings);

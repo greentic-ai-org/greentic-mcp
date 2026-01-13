@@ -19,6 +19,9 @@ use crate::config::{DynSecretsStore, RuntimePolicy};
 use crate::error::RunnerError;
 use crate::router::try_call_tool_router;
 use crate::verify::VerifiedArtifact;
+
+const LEGACY_EXEC_INTERFACE: &str = "legacy:exec/exec";
+type LegacyExecFunc = wasmtime::component::TypedFunc<(String, String), (String,)>;
 pub struct ExecutionContext<'a> {
     pub runtime: &'a RuntimePolicy,
     pub http_enabled: bool,
@@ -122,6 +125,9 @@ fn run_sync(
         &engine,
         StoreState::new(http_enabled, secrets_store, request.tenant.clone()),
     );
+    // Epoch interruption requires an explicit deadline; set a far future deadline
+    // until a caller opts into tighter wallclock control.
+    store.set_epoch_deadline(u64::MAX / 2);
 
     let args_json = serde_json::to_string(&request.args)?;
     if let Some(value) = try_call_tool_router(
@@ -135,7 +141,11 @@ fn run_sync(
     }
 
     let instance = linker.instantiate(&mut store, &component)?;
-    let exec = instance.get_typed_func::<(String, String), (String,)>(&mut store, "exec")?;
+    let exec = if let Some(func) = legacy_exec_func(&instance, &mut store)? {
+        func
+    } else {
+        instance.get_typed_func::<(String, String), (String,)>(&mut store, "exec")?
+    };
 
     let started = Instant::now();
     let (raw_response,) = match exec.call(&mut store, (request.action.clone(), args_json)) {
@@ -162,6 +172,22 @@ fn run_sync(
     Ok(value)
 }
 
+fn legacy_exec_func(
+    instance: &wasmtime::component::Instance,
+    store: &mut Store<StoreState>,
+) -> Result<Option<LegacyExecFunc>, RunnerError> {
+    let Some(interface_index) = instance.get_export_index(&mut *store, None, LEGACY_EXEC_INTERFACE)
+    else {
+        return Ok(None);
+    };
+    let Some(func_index) = instance.get_export_index(&mut *store, Some(&interface_index), "exec")
+    else {
+        return Ok(None);
+    };
+    let func = instance.get_typed_func::<(String, String), (String,)>(&mut *store, &func_index)?;
+    Ok(Some(func))
+}
+
 pub struct StoreState {
     http_enabled: bool,
     http_client: Option<reqwest::blocking::Client>,
@@ -181,7 +207,12 @@ impl StoreState {
         secrets_store: Option<DynSecretsStore>,
         tenant: Option<greentic_types::TenantCtx>,
     ) -> Self {
-        let wasi_ctx = WasiCtxBuilder::new().inherit_stdio().inherit_env().build();
+        let mut builder = WasiCtxBuilder::new();
+        builder.inherit_stdio().inherit_env();
+        if http_enabled {
+            builder.inherit_network().allow_ip_name_lookup(true);
+        }
+        let wasi_ctx = builder.build();
         Self {
             http_enabled,
             http_client: None,

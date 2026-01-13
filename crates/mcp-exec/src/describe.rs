@@ -124,6 +124,7 @@ fn try_describe_v1(name: &str, cfg: &ExecConfig) -> Result<Option<Value>> {
     };
     let linker = Linker::new(&engine);
     let mut store = Store::new(&engine, ());
+    store.set_epoch_deadline(u64::MAX / 2);
 
     let instance = match linker.instantiate(&mut store, &component) {
         Ok(instance) => instance,

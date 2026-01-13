@@ -25,4 +25,4 @@ impl Guest for Legacy {
 }
 
 #[cfg(target_arch = "wasm32")]
-bindings::export!(Legacy);
+bindings::export!(Legacy with_types_in bindings);

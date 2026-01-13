@@ -1,0 +1,1 @@
+/projects/ai/greentic-ng/greentic-mcp/crates/mcp-exec/tests/legacy_exec/target/wasm32-wasip2/release/legacy_exec.wasm: /projects/ai/greentic-ng/greentic-mcp/crates/mcp-exec/tests/legacy_exec/src/lib.rs

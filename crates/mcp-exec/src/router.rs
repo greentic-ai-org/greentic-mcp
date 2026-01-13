@@ -27,7 +27,10 @@ pub(crate) fn try_call_tool_router(
         Ok(router) => router,
         Err(err) => {
             let msg = err.to_string();
-            if msg.contains("unknown export") || msg.contains("No such export") {
+            if msg.contains("unknown export")
+                || msg.contains("No such export")
+                || msg.contains("no exported instance named")
+            {
                 return Ok(None);
             }
             return Err(err);
@@ -56,7 +59,10 @@ pub(crate) fn try_list_tools_router(
         Ok(router) => router,
         Err(err) => {
             let msg = err.to_string();
-            if msg.contains("unknown export") || msg.contains("No such export") {
+            if msg.contains("unknown export")
+                || msg.contains("No such export")
+                || msg.contains("no exported instance named")
+            {
                 return Ok(None);
             }
             return Err(err);

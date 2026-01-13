@@ -19,16 +19,19 @@ fn build_fixture(path: &str, crate_name: &str) -> Option<PathBuf> {
     }
 
     let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(path);
+    let target_dir = crate_dir.join("target");
     let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".into());
     let status = Command::new(cargo)
         .args(["build", "--target", "wasm32-wasip2", "--release"])
+        .arg("--target-dir")
+        .arg(&target_dir)
         .current_dir(&crate_dir)
         .status();
 
     match status {
         Ok(status) if status.success() => Some(
-            crate_dir
-                .join("target/wasm32-wasip2/release")
+            target_dir
+                .join("wasm32-wasip2/release")
                 .join(format!("{crate_name}.wasm")),
         ),
         _ => {
