@@ -4,7 +4,7 @@ use std::sync::mpsc::{self, RecvTimeoutError};
 use std::thread;
 use std::time::Instant;
 
-use greentic_interfaces::runner_host_v1::{self as runner_host, RunnerHost};
+use greentic_interfaces_wasmtime::host_helpers::v1::{runner_host_http, runner_host_kv};
 use greentic_types::TenantCtx;
 use serde_json::Value;
 use wasmtime::component::{Component, Linker};
@@ -117,8 +117,10 @@ fn run_sync(
     let mut linker = Linker::new(&engine);
     linker.allow_shadowing(true);
     add_wasi_to_linker(&mut linker).map_err(|err| RunnerError::Internal(err.to_string()))?;
-    runner_host::add_to_linker(&mut linker, |state: &mut StoreState| state)
-        .map_err(RunnerError::from)?;
+    runner_host_http::add_runner_host_http_to_linker(&mut linker, |state: &mut StoreState| state)
+        .map_err(|err| RunnerError::Internal(err.to_string()))?;
+    runner_host_kv::add_runner_host_kv_to_linker(&mut linker, |state: &mut StoreState| state)
+        .map_err(|err| RunnerError::Internal(err.to_string()))?;
     add_secrets_to_linker(&mut linker)?;
 
     let mut store = Store::new(
@@ -288,61 +290,82 @@ impl StoreState {
     }
 }
 
-impl RunnerHost for StoreState {
+impl StoreState {
     fn http_request(
         &mut self,
         method: String,
         url: String,
         headers: Vec<String>,
         body: Option<Vec<u8>>,
-    ) -> wasmtime::Result<Result<Vec<u8>, String>> {
+    ) -> Result<Vec<u8>, String> {
         if !self.http_enabled {
-            return Ok(Err("http-disabled".into()));
+            return Err("http-disabled".into());
         }
 
         use reqwest::Method;
 
-        let client = match self.http_client() {
-            Ok(client) => client,
-            Err(err) => return Ok(Err(err)),
-        };
-
-        let method = match Method::from_bytes(method.as_bytes()) {
-            Ok(method) => method,
-            Err(_) => return Ok(Err("invalid-method".into())),
-        };
+        let client = self.http_client()?;
+        let method =
+            Method::from_bytes(method.as_bytes()).map_err(|_| "invalid-method".to_string())?;
 
         let builder = client.request(method, &url);
-        let mut builder = match apply_headers(builder, &headers) {
-            Ok(builder) => builder,
-            Err(err) => return Ok(Err(err)),
-        };
+        let mut builder = apply_headers(builder, &headers)?;
 
         if let Some(body) = body {
             builder = builder.body(body);
         }
 
-        let response = match builder.send() {
-            Ok(resp) => resp,
-            Err(err) => return Ok(Err(format!("request: {err}"))),
-        };
+        let response = builder.send().map_err(|err| format!("request: {err}"))?;
 
         if !response.status().is_success() {
-            return Ok(Err(format!("status-{}", response.status().as_u16())));
+            return Err(format!("status-{}", response.status().as_u16()));
         }
 
-        match response.bytes() {
-            Ok(bytes) => Ok(Ok(bytes.to_vec())),
-            Err(err) => Ok(Err(format!("body: {err}"))),
-        }
+        response
+            .bytes()
+            .map(|bytes| bytes.to_vec())
+            .map_err(|err| format!("body: {err}"))
     }
 
-    fn kv_get(&mut self, _ns: String, _key: String) -> wasmtime::Result<Option<String>> {
-        Ok(None)
+    fn kv_get(&mut self, _ns: String, _key: String) -> Option<String> {
+        None
     }
 
-    fn kv_put(&mut self, _ns: String, _key: String, _val: String) -> wasmtime::Result<()> {
-        Ok(())
+    fn kv_put(&mut self, _ns: String, _key: String, _val: String) {}
+}
+
+impl runner_host_http::RunnerHostHttp for StoreState {
+    fn request(
+        &mut self,
+        method: wasmtime::component::__internal::String,
+        url: wasmtime::component::__internal::String,
+        headers: wasmtime::component::__internal::Vec<wasmtime::component::__internal::String>,
+        body: Option<wasmtime::component::__internal::Vec<u8>>,
+    ) -> std::result::Result<
+        wasmtime::component::__internal::Vec<u8>,
+        wasmtime::component::__internal::String,
+    > {
+        let headers = headers.into_iter().collect();
+        self.http_request(method, url, headers, body)
+    }
+}
+
+impl runner_host_kv::RunnerHostKv for StoreState {
+    fn get(
+        &mut self,
+        ns: wasmtime::component::__internal::String,
+        key: wasmtime::component::__internal::String,
+    ) -> Option<wasmtime::component::__internal::String> {
+        self.kv_get(ns, key)
+    }
+
+    fn put(
+        &mut self,
+        ns: wasmtime::component::__internal::String,
+        key: wasmtime::component::__internal::String,
+        val: wasmtime::component::__internal::String,
+    ) {
+        self.kv_put(ns.to_string(), key.to_string(), val.to_string());
     }
 }
 
@@ -483,18 +506,16 @@ mod tests {
     #[test]
     fn http_request_requires_flag() {
         let mut state = StoreState::new(false, None, None);
-        let result = state
-            .http_request("GET".into(), "https://example.com".into(), Vec::new(), None)
-            .expect("request should run");
+        let result =
+            state.http_request("GET".into(), "https://example.com".into(), Vec::new(), None);
         assert!(matches!(result, Err(err) if err == "http-disabled"));
     }
 
     #[test]
     fn http_request_rejects_invalid_method() {
         let mut state = StoreState::new(true, None, None);
-        let result = state
-            .http_request("???".into(), "https://example.com".into(), Vec::new(), None)
-            .expect("request should run");
+        let result =
+            state.http_request("???".into(), "https://example.com".into(), Vec::new(), None);
         assert!(matches!(result, Err(err) if err == "invalid-method"));
     }
 
@@ -540,8 +561,12 @@ mod tests {
         let mut linker = Linker::new(&engine);
         linker.allow_shadowing(true);
         add_wasi_to_linker(&mut linker).expect("add preview2 imports");
-        runner_host::add_to_linker(&mut linker, |state: &mut StoreState| state)
-            .expect("runner host linking");
+        runner_host_http::add_runner_host_http_to_linker(&mut linker, |state: &mut StoreState| {
+            state
+        })
+        .expect("runner host http linking");
+        runner_host_kv::add_runner_host_kv_to_linker(&mut linker, |state: &mut StoreState| state)
+            .expect("runner host kv linking");
         add_secrets_to_linker(&mut linker).expect("secrets linking");
 
         let mut store = Store::new(&engine, StoreState::new(false, None, None));

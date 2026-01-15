@@ -10,8 +10,8 @@ readme = "README.md"
 [features]
 default = ["wasi", "describe-v1", "runner-host-v1"]
 wasi = []
-describe-v1 = ["greentic-interfaces/describe-v1"]
-runner-host-v1 = ["greentic-interfaces/runner-host-v1"]
+describe-v1 = []
+runner-host-v1 = []
 
 [dependencies]
 anyhow.workspace = true
@@ -26,7 +26,6 @@ tracing.workspace = true
 wasmtime.workspace = true
 wasmtime-wasi.workspace = true
 greentic-types.workspace = true
-greentic-interfaces.workspace = true
 greentic-mcp-exec = { workspace = true }
 
 [dev-dependencies]

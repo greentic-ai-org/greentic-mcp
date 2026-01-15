@@ -24,7 +24,7 @@ tracing.workspace = true
 wasmtime.workspace = true
 wasmtime-wasi.workspace = true
 greentic-types.workspace = true
-greentic-interfaces.workspace = true
+greentic-interfaces-wasmtime.workspace = true
 reqwest.workspace = true
 base64 = "0.22"
 clap.workspace = true
@@ -33,8 +33,8 @@ tempfile.workspace = true
 
 [features]
 default = ["describe-v1", "runner-host-v1"]
-describe-v1 = ["greentic-interfaces/describe-v1"]
-runner-host-v1 = ["greentic-interfaces/runner-host-v1"]
+describe-v1 = []
+runner-host-v1 = []
 
 [dev-dependencies]
 tempfile.workspace = true

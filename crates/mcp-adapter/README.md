@@ -1,6 +1,6 @@
 # Greentic MCP Adapter (wasix:mcp@25.06.18)
 
-Guest component template that exports `greentic:component@0.4.0` and imports `wasix:mcp@25.06.18`. Intended to be composed with an MCP router component at pack-build time to produce the final MCP component artifact.
+Guest component template that exports `greentic:component/node@0.5.0` and imports `wasix:mcp@25.06.18`. Intended to be composed with an MCP router component at pack-build time to produce the final MCP component artifact.
 
 ## Input contract
 

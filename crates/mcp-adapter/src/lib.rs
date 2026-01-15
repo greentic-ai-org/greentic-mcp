@@ -118,7 +118,7 @@ impl Guest for Adapter {
             "version": env!("CARGO_PKG_VERSION"),
             "protocol": PROTOCOL,
             "operations": ["list", "call"],
-            "description": "MCP adapter template exporting greentic:component@0.4.0 and importing wasix:mcp@25.06.18.",
+            "description": "MCP adapter template exporting greentic:component/node@0.5.0 and importing wasix:mcp@25.06.18.",
         }))
         .unwrap_or_else(|_| "{}".into())
     }
@@ -154,7 +154,7 @@ impl Guest for Adapter {
 }
 
 #[cfg(target_arch = "wasm32")]
-bindings::exports::greentic::component::node::__export_greentic_component_node_0_4_0_cabi!(
+bindings::exports::greentic::component::node::__export_greentic_component_node_0_5_0_cabi!(
     Adapter with_types_in bindings::exports::greentic::component::node
 );
 
@@ -560,6 +560,14 @@ fn default_arguments() -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cell::RefCell;
+    use std::path::PathBuf;
+    use std::process::Command;
+    use wasmtime::component::Linker;
+    use wasmtime::{Engine, Store};
+    use wasmtime_wasi::{
+        ResourceTable, WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView, p2::add_to_linker_sync,
+    };
 
     struct MockRouter {
         tools: Vec<router::Tool>,
@@ -649,6 +657,57 @@ mod tests {
     }
 
     #[test]
+    fn call_operation_preserves_typed_arguments() {
+        struct AssertArgsRouter {
+            expected: Value,
+        }
+
+        impl McpRouter for AssertArgsRouter {
+            fn list_tools(&self) -> Result<Vec<router::Tool>, RouterError> {
+                Ok(vec![])
+            }
+
+            fn call_tool(
+                &self,
+                _tool: &str,
+                arguments: &Value,
+            ) -> Result<router::Response, CallFailure> {
+                if arguments != &self.expected {
+                    return Err(CallFailure::Transport(format!(
+                        "unexpected arguments: {arguments}"
+                    )));
+                }
+
+                Ok(router::Response::Completed(router::ToolResult {
+                    content: vec![],
+                    structured_content: None,
+                    progress: None,
+                    meta: None,
+                    is_error: None,
+                }))
+            }
+        }
+
+        let router = AssertArgsRouter {
+            expected: json!({
+                "count": 3,
+                "active": true,
+                "items": ["a", "b"],
+                "meta": {"score": 9.5},
+            }),
+        };
+
+        let result = handle_invoke(
+            &router,
+            "",
+            r#"{"operation":"call","tool":"demo","arguments":{"count":3,"active":true,"items":["a","b"],"meta":{"score":9.5}}}"#,
+        )
+        .expect("call should succeed");
+
+        assert_eq!(result.get("ok"), Some(&Value::Bool(true)));
+    }
+
+    #[test]
     fn tool_error_maps_to_envelope() {
         let _router = MockRouter {
             tools: vec![],
@@ -728,5 +787,317 @@ mod tests {
             messages.first().and_then(|m| m.get("type")),
             Some(&Value::String("resource_link".into()))
         );
+    }
+
+    mod router_bindings {
+        wasmtime::component::bindgen!({
+            path: "wit/deps/wasix-mcp-25.6.18",
+            world: "mcp-router",
+        });
+    }
+    use router_bindings::exports::wasix::mcp::router as router_exports;
+
+    struct RouterCtx {
+        table: ResourceTable,
+        ctx: WasiCtx,
+    }
+
+    impl RouterCtx {
+        fn new() -> Self {
+            let mut builder = WasiCtxBuilder::new();
+            builder.inherit_stdio();
+            builder.inherit_env();
+            builder.allow_blocking_current_thread(true);
+            Self {
+                table: ResourceTable::new(),
+                ctx: builder.build(),
+            }
+        }
+    }
+
+    impl WasiView for RouterCtx {
+        fn ctx(&mut self) -> WasiCtxView<'_> {
+            WasiCtxView {
+                ctx: &mut self.ctx,
+                table: &mut self.table,
+            }
+        }
+    }
+
+    fn target_installed() -> bool {
+        Command::new("rustup")
+            .args(["target", "list", "--installed"])
+            .output()
+            .ok()
+            .and_then(|out| String::from_utf8(out.stdout).ok())
+            .map(|list| list.lines().any(|l| l.trim() == "wasm32-wasip2"))
+            .unwrap_or(false)
+    }
+
+    fn build_router_echo() -> Option<PathBuf> {
+        if !target_installed() {
+            eprintln!(
+                "Skipping adapter/router composition test; wasm32-wasip2 target not installed"
+            );
+            return None;
+        }
+
+        let crate_dir =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../mcp-exec/tests/router_echo");
+        let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".into());
+        let status = Command::new(cargo)
+            .args(["build", "--target", "wasm32-wasip2", "--release"])
+            .current_dir(&crate_dir)
+            .status();
+
+        match status {
+            Ok(status) if status.success() => {
+                Some(crate_dir.join("target/wasm32-wasip2/release/router_echo.wasm"))
+            }
+            _ => {
+                eprintln!("Skipping adapter/router composition test; router build failed");
+                None
+            }
+        }
+    }
+
+    fn map_annotations(ann: Option<router_exports::Annotations>) -> Option<router::Annotations> {
+        ann.map(|ann| router::Annotations {
+            audience: ann.audience.map(|roles| {
+                roles
+                    .into_iter()
+                    .map(|role| match role {
+                        router_exports::Role::User => router::Role::User,
+                        router_exports::Role::Assistant => router::Role::Assistant,
+                    })
+                    .collect()
+            }),
+            priority: ann.priority,
+            timestamp: ann.timestamp,
+        })
+    }
+
+    fn map_tool_annotations(
+        ann: Option<router_exports::ToolAnnotations>,
+    ) -> Option<router::ToolAnnotations> {
+        ann.map(|ann| router::ToolAnnotations {
+            read_only: ann.read_only,
+            destructive: ann.destructive,
+            streaming: ann.streaming,
+            experimental: ann.experimental,
+        })
+    }
+
+    fn map_meta(entries: Option<Vec<router_exports::MetaEntry>>) -> Option<Vec<router::MetaEntry>> {
+        entries.map(|entries| {
+            entries
+                .into_iter()
+                .map(|entry| router::MetaEntry {
+                    key: entry.key,
+                    value: entry.value,
+                })
+                .collect()
+        })
+    }
+
+    fn map_tool(tool: router_exports::Tool) -> router::Tool {
+        router::Tool {
+            name: tool.name,
+            title: tool.title,
+            description: tool.description,
+            input_schema: tool.input_schema,
+            output_schema: tool.output_schema,
+            annotations: map_tool_annotations(tool.annotations),
+            meta: map_meta(tool.meta),
+        }
+    }
+
+    fn map_progress(
+        items: Option<Vec<router_exports::ProgressNotification>>,
+    ) -> Option<Vec<router::ProgressNotification>> {
+        items.map(|items| {
+            items
+                .into_iter()
+                .map(|item| router::ProgressNotification {
+                    progress: item.progress,
+                    message: item.message,
+                    annotations: map_annotations(item.annotations),
+                })
+                .collect()
+        })
+    }
+
+    fn map_content_block(block: router_exports::ContentBlock) -> router::ContentBlock {
+        match block {
+            router_exports::ContentBlock::Text(text) => {
+                router::ContentBlock::Text(router::TextContent {
+                    text: text.text,
+                    annotations: map_annotations(text.annotations),
+                })
+            }
+            router_exports::ContentBlock::Image(image) => {
+                router::ContentBlock::Image(router::ImageContent {
+                    data: image.data,
+                    mime_type: image.mime_type,
+                    annotations: map_annotations(image.annotations),
+                })
+            }
+            router_exports::ContentBlock::Audio(audio) => {
+                router::ContentBlock::Audio(router::AudioContent {
+                    data: audio.data,
+                    mime_type: audio.mime_type,
+                    annotations: map_annotations(audio.annotations),
+                })
+            }
+            router_exports::ContentBlock::ResourceLink(link) => {
+                router::ContentBlock::ResourceLink(router::ResourceLinkContent {
+                    uri: link.uri,
+                    title: link.title,
+                    description: link.description,
+                    mime_type: link.mime_type,
+                    annotations: map_annotations(link.annotations),
+                })
+            }
+            router_exports::ContentBlock::EmbeddedResource(resource) => {
+                router::ContentBlock::EmbeddedResource(router::EmbeddedResource {
+                    uri: resource.uri,
+                    title: resource.title,
+                    description: resource.description,
+                    mime_type: resource.mime_type,
+                    data: resource.data,
+                    annotations: map_annotations(resource.annotations),
+                })
+            }
+        }
+    }
+
+    fn map_tool_result(result: router_exports::ToolResult) -> router::ToolResult {
+        router::ToolResult {
+            content: result.content.into_iter().map(map_content_block).collect(),
+            structured_content: result.structured_content,
+            progress: map_progress(result.progress),
+            meta: map_meta(result.meta),
+            is_error: result.is_error,
+        }
+    }
+
+    fn map_elicitation(req: router_exports::ElicitationRequest) -> router::ElicitationRequest {
+        router::ElicitationRequest {
+            title: req.title,
+            message: req.message,
+            schema: req.schema,
+            annotations: map_annotations(req.annotations),
+            meta: map_meta(req.meta),
+        }
+    }
+
+    fn map_response(response: router_exports::Response) -> router::Response {
+        match response {
+            router_exports::Response::Completed(result) => {
+                router::Response::Completed(map_tool_result(result))
+            }
+            router_exports::Response::Elicit(req) => router::Response::Elicit(map_elicitation(req)),
+        }
+    }
+
+    fn map_tool_error(err: router_exports::ToolError) -> router::ToolError {
+        match err {
+            router_exports::ToolError::InvalidParameters(msg) => {
+                router::ToolError::InvalidParameters(msg)
+            }
+            router_exports::ToolError::ExecutionError(msg) => {
+                router::ToolError::ExecutionError(msg)
+            }
+            router_exports::ToolError::SchemaError(msg) => router::ToolError::SchemaError(msg),
+            router_exports::ToolError::NotFound(msg) => router::ToolError::NotFound(msg),
+        }
+    }
+
+    struct ComponentRouter {
+        router: router_bindings::McpRouter,
+        store: RefCell<Store<RouterCtx>>,
+    }
+
+    impl ComponentRouter {
+        fn new(wasm_path: &PathBuf) -> Result<Self, String> {
+            let mut config = wasmtime::Config::new();
+            config.wasm_component_model(true);
+            config.async_support(false);
+            let engine = Engine::new(&config).map_err(|err| err.to_string())?;
+            let component = wasmtime::component::Component::from_file(&engine, wasm_path)
+                .map_err(|err| err.to_string())?;
+
+            let mut linker: Linker<RouterCtx> = Linker::new(&engine);
+            add_to_linker_sync(&mut linker).map_err(|err| err.to_string())?;
+
+            let mut store = Store::new(&engine, RouterCtx::new());
+            let router = router_bindings::McpRouter::instantiate(&mut store, &component, &linker)
+                .map_err(|err| err.to_string())?;
+
+            Ok(Self {
+                router,
+                store: RefCell::new(store),
+            })
+        }
+    }
+
+    impl McpRouter for ComponentRouter {
+        fn list_tools(&self) -> Result<Vec<router::Tool>, RouterError> {
+            let mut store = self.store.borrow_mut();
+            let tools = self
+                .router
+                .wasix_mcp_router()
+                .call_list_tools(&mut *store)
+                .map_err(|err| RouterError::Transport(err.to_string()))?;
+            Ok(tools.into_iter().map(map_tool).collect())
+        }
+
+        fn call_tool(
+            &self,
+            tool: &str,
+            arguments: &Value,
+        ) -> Result<router::Response, CallFailure> {
+            let mut store = self.store.borrow_mut();
+            let args_json = serde_json::to_string(arguments)
+                .map_err(|err| CallFailure::Transport(err.to_string()))?;
+            let response = self
+                .router
+                .wasix_mcp_router()
+                .call_call_tool(&mut *store, tool, &args_json)
+                .map_err(|err| CallFailure::Transport(err.to_string()))?;
+            let response = response
+                .map_err(map_tool_error)
+                .map_err(CallFailure::Tool)?;
+            Ok(map_response(response))
+        }
+    }
+
+    #[test]
+    fn adapter_handles_router_echo_component() {
+        let Some(wasm_path) = build_router_echo() else {
+            return;
+        };
+
+        let router = ComponentRouter::new(&wasm_path).expect("router component");
+
+        let list = handle_invoke(&router, "", r#"{"arguments": {}}"#).expect("list should succeed");
+        let tools = list
+            .pointer("/result/tools")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
+        assert_eq!(tools.len(), 1);
+
+        let call = handle_invoke(
+            &router,
+            "",
+            r#"{"operation":"call","tool":"echo","arguments":{"hello":"world"}}"#,
+        )
+        .expect("call should succeed");
+        let echoed = call
+            .pointer("/result/content/0/text")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        assert!(echoed.contains("\"hello\":\"world\""));
     }
 }

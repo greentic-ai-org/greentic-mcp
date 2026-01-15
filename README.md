@@ -3,8 +3,7 @@
 Executor and component tooling for the Greentic platform targeting the
 `wasix:mcp` interface. The workspace currently provides a reusable Rust
 library (`greentic-mcp-exec`) that can load Wasm components, verify their provenance,
-wire in the Greentic host imports, and execute the exported MCP entrypoint,
-plus placeholder crates for future component work.
+wire in the Greentic host imports, and execute the exported MCP entrypoint.
 
 ## Workspace layout
 
@@ -69,7 +68,7 @@ Key features:
 
 Guest component template that:
 
-- Exports `greentic:component@0.4.0` and imports `wasix:mcp@25.06.18`.
+- Exports `greentic:component/node@0.5.0` and imports `wasix:mcp@25.06.18`.
 - Accepts JSON payloads of `{operation?, tool?, arguments?}`:
   - Defaults to `list` when no tool is provided; defaults to `call` when a tool is present.
   - Maps `list` → `list-tools`, `call` → `call-tool(tool, arguments)`.
@@ -153,7 +152,7 @@ models MCP message shapes and executes tools locally via WIT/wasm host calls.
 - greentic-mcp builds and publishes the MCP adapter for `wasix:mcp@25.06.18` to GHCR:
   - `ghcr.io/greentic-ai/greentic-mcp-adapter:25.06.18-v<adapter_version>`
   - `ghcr.io/greentic-ai/greentic-mcp-adapter:25.06.18-stable` (moving pointer)
-- The pushed artifact is `mcp_adapter_25_06_18.component.wasm`, implementing `greentic:component@0.4.0` and importing `wasix:mcp@25.06.18`.
+- The pushed artifact is `mcp_adapter_25_06_18.component.wasm`, implementing `greentic:component/node@0.5.0` and importing `wasix:mcp@25.06.18`.
 - See `.github/workflows/publish-mcp-adapter.yml` and `scripts/build_adapter.sh` for the build/publish steps.
 
 ## Roadmap

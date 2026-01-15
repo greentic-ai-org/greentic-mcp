@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result, anyhow};
 use clap::{Parser, Subcommand};
-use greentic_interfaces::runner_host_v1 as runner_host;
+use greentic_interfaces_wasmtime::host_helpers::v1::{runner_host_http, runner_host_kv};
 use greentic_mcp_exec::router;
 use greentic_mcp_exec::runner::{StoreState, add_secrets_to_linker};
 use wasmtime::component::{Component, Linker};
@@ -130,8 +130,10 @@ fn invoke_router(
     let mut linker = Linker::new(&engine);
     linker.allow_shadowing(true);
     add_wasi_to_linker(&mut linker).context("linking wasi preview2 imports")?;
-    runner_host::add_to_linker(&mut linker, |state: &mut StoreState| state)
-        .context("linking runner host")?;
+    runner_host_http::add_runner_host_http_to_linker(&mut linker, |state: &mut StoreState| state)
+        .context("linking runner host http")?;
+    runner_host_kv::add_runner_host_kv_to_linker(&mut linker, |state: &mut StoreState| state)
+        .context("linking runner host kv")?;
     add_secrets_to_linker(&mut linker).context("linking secrets host")?;
 
     let http_enabled = cmd.enable_http && !cmd.list_tools;
