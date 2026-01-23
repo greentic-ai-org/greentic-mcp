@@ -5,6 +5,20 @@ bridge used by flows to invoke MCP tools compiled to WebAssembly. It loads a
 declarative tool map, resolves tools by logical name, and executes them through
 Wasmtime with per-tool timeouts, retry hints, and transient error handling.
 
+## Component composer CLI
+
+`greentic-mcp` ships a `greentic-mcp` CLI that composes a router component into
+the bundled MCP adapter component. The result is the merged component that
+flows reference.
+
+```bash
+greentic-mcp compose ./router.component.wasm -o ./merged.component.wasm
+```
+
+Notes:
+- `wasm-tools` must be available in `PATH` (or set `GREENTIC_MCP_WASM_TOOLS`).
+- The bundled adapter targets `wasix:mcp@25.06.18`.
+
 The crate leans on the shared contracts published in
 [`greentic-types`](https://docs.rs/greentic-types) and the WIT definitions plus
 generated bindings in [`greentic-interfaces`](https://docs.rs/greentic-interfaces).

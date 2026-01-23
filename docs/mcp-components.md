@@ -25,3 +25,9 @@ How it is used:
 - Composed at pack-build time with a router component to produce the final
   artifact that flows reference.
 - Detailed payload/response behavior lives in `crates/mcp-adapter/README.md`.
+
+The `greentic-mcp` CLI can perform this composition with the bundled adapter:
+
+```bash
+greentic-mcp compose ./router.component.wasm -o ./merged.component.wasm
+```

@@ -27,9 +27,10 @@ wasmtime.workspace = true
 wasmtime-wasi.workspace = true
 greentic-types.workspace = true
 greentic-mcp-exec = { workspace = true }
+clap.workspace = true
+tempfile.workspace = true
 
 [dev-dependencies]
-tempfile.workspace = true
 
 [lib]
 name = "greentic_mcp"
