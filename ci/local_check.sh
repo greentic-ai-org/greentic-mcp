@@ -139,6 +139,21 @@ if [[ -f scripts/version-tools.sh ]]; then
   fi
 fi
 
+run_cmd "Block tracked build artifacts (target/dist/build/cache)" bash -c '
+  set -euo pipefail
+  if ! command -v rg >/dev/null 2>&1; then
+    echo "[skip] rg not found; cannot enforce tracked artifact guard"
+    exit 0
+  fi
+  matches="$(git ls-files | rg -n "(^|/)(target|dist|build|node_modules|coverage|\\.pytest_cache|\\.cache)/" || true)"
+  if [[ -n "${matches}" ]]; then
+    echo "ERROR: tracked build artifacts detected. Remove from index with:"
+    echo "  git rm -r --cached <path>"
+    echo "${matches}"
+    exit 1
+  fi
+'
+
 if ensure_tool rg "Canonical greentic-interfaces import guard"; then
   run_cmd "Enforce canonical greentic-interfaces imports" bash -c 'set -euo pipefail; if rg -n "greentic_interfaces::bindings::|\\bbindings::greentic::" --glob "!**/target/**" --glob "!.codex/**" --glob "!ci/local_check.sh" .; then echo "ERROR: use greentic_interfaces::canonical instead of bindings::*"; exit 1; fi'
 fi
