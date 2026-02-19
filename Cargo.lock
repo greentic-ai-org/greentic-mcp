@@ -464,9 +464,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.5.59"
+version = "4.5.60"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c5caf74d17c3aec5495110c34cc3f78644bfa89af6c8993ed4de2790e49b6499"
+checksum = "2797f34da339ce31042b27d23607e051786132987f595b02ba4f6a6dffb7030a"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -474,9 +474,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.5.59"
+version = "4.5.60"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "370daa45065b80218950227371916a1633217ae42b2715b2287b606dcd618e24"
+checksum = "24a241312cea5059b13574bb9b3861cabf758b879c15190b37b6d6fd63ab6876"
 dependencies = [
  "anstream",
  "anstyle",
@@ -1091,9 +1091,9 @@ dependencies = [
 
 [[package]]
 name = "greentic-interfaces"
-version = "0.4.103"
+version = "0.4.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "269cc48ca52e673316a523a98e6dcac99ecc0d2e0f8b9e5a9c0eac42dd8ee735"
+checksum = "c88aab4e287b10a39e935b042fea97b6b2dff5f738a45efd0a5da54320c09c4b"
 dependencies = [
  "anyhow",
  "greentic-types",
@@ -1108,9 +1108,9 @@ dependencies = [
 
 [[package]]
 name = "greentic-interfaces-guest"
-version = "0.4.103"
+version = "0.4.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03eda74676a7be3f1ed672a381c27de347a7b2d4518d21d946afab24e47b7130"
+checksum = "ad0b07b619a1c1fada427f37adad6fdde7f3687e5e9bed9ecd44b6d5f629b29a"
 dependencies = [
  "greentic-interfaces",
  "greentic-types",
@@ -1121,9 +1121,9 @@ dependencies = [
 
 [[package]]
 name = "greentic-interfaces-wasmtime"
-version = "0.4.103"
+version = "0.4.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3187031233e905cdc7d364d1aa06a45777b0d7e4294451929776d996379c0011"
+checksum = "26eb796a93d6267a0c94aba661b8bdb51f19fa2b8067ff483201d90c4b3e6a8b"
 dependencies = [
  "anyhow",
  "camino",
@@ -1137,7 +1137,7 @@ dependencies = [
 
 [[package]]
 name = "greentic-mcp"
-version = "0.4.20"
+version = "0.4.21"
 dependencies = [
  "anyhow",
  "clap",
@@ -1158,7 +1158,7 @@ dependencies = [
 
 [[package]]
 name = "greentic-mcp-adapter"
-version = "0.4.20"
+version = "0.4.21"
 dependencies = [
  "greentic-interfaces-guest",
  "serde",
@@ -1171,7 +1171,7 @@ dependencies = [
 
 [[package]]
 name = "greentic-mcp-exec"
-version = "0.4.20"
+version = "0.4.21"
 dependencies = [
  "anyhow",
  "async-trait",
