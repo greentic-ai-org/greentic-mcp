@@ -12,8 +12,6 @@ mod bindings {
 use bindings::exports::greentic::component::node::{
     ExecCtx, Guest, InvokeResult, LifecycleStatus, NodeError, StreamEvent,
 };
-#[allow(unused_imports)]
-use bindings::greentic::component::control;
 use bindings::wasix::mcp::router;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};

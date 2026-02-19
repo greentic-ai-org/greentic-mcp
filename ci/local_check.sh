@@ -139,6 +139,10 @@ if [[ -f scripts/version-tools.sh ]]; then
   fi
 fi
 
+if ensure_tool rg "Canonical greentic-interfaces import guard"; then
+  run_cmd "Enforce canonical greentic-interfaces imports" bash -c 'set -euo pipefail; if rg -n "greentic_interfaces::bindings::|\\bbindings::greentic::" --glob "!**/target/**" --glob "!.codex/**" --glob "!ci/local_check.sh" .; then echo "ERROR: use greentic_interfaces::canonical instead of bindings::*"; exit 1; fi'
+fi
+
 run_cmd "cargo fmt --all -- --check" cargo fmt --all -- --check
 run_cmd "cargo clippy --workspace --all-targets -- -D warnings" cargo clippy --workspace --all-targets -- -D warnings
 run_cmd "cargo build --workspace --locked" cargo build --workspace --locked

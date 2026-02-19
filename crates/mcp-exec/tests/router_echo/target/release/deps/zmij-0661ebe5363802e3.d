@@ -1,0 +1,9 @@
+/projects/ai/greentic-ng/greentic-mcp/crates/mcp-exec/tests/router_echo/target/release/deps/zmij-0661ebe5363802e3.d: /home/remote/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zmij-1.0.21/src/lib.rs /home/remote/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zmij-1.0.21/src/stdarch_x86.rs /home/remote/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zmij-1.0.21/src/traits.rs
+
+/projects/ai/greentic-ng/greentic-mcp/crates/mcp-exec/tests/router_echo/target/release/deps/libzmij-0661ebe5363802e3.rlib: /home/remote/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zmij-1.0.21/src/lib.rs /home/remote/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zmij-1.0.21/src/stdarch_x86.rs /home/remote/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zmij-1.0.21/src/traits.rs
+
+/projects/ai/greentic-ng/greentic-mcp/crates/mcp-exec/tests/router_echo/target/release/deps/libzmij-0661ebe5363802e3.rmeta: /home/remote/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zmij-1.0.21/src/lib.rs /home/remote/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zmij-1.0.21/src/stdarch_x86.rs /home/remote/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zmij-1.0.21/src/traits.rs
+
+/home/remote/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zmij-1.0.21/src/lib.rs:
+/home/remote/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zmij-1.0.21/src/stdarch_x86.rs:
+/home/remote/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zmij-1.0.21/src/traits.rs:

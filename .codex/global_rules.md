@@ -70,3 +70,6 @@ Whenever I ask you to implement a change, feature, refactor, or bugfix (i.e. PR-
 ---
 
 The “Repo Overview Maintenance” routine is defined in `.codex/repo_overview_task.md`. Follow it exactly whenever instructed above.
+
+Additional policy for downstream interface usage:
+- `.codex/PR-01-interfaces.md` (must use `greentic_interfaces::canonical`; never `greentic_interfaces::bindings::*` outside `greentic-interfaces` itself).
