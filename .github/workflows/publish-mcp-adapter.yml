@@ -63,10 +63,54 @@ jobs:
 
       - name: Push adapter OCI artifacts
         run: |
+          set -Eeuo pipefail
+
           VERSION="${{ steps.meta.outputs.version }}"
           COMPONENT="${{ steps.meta.outputs.component }}"
           PRIMARY_TAG="${IMAGE_BASE}:${PROTOCOL}-v${VERSION}"
           STABLE_TAG="${IMAGE_BASE}:${PROTOCOL}-stable"
+
+          dump_publish_debug() {
+            local exit_code="$1"
+            echo ""
+            echo "=== ORAS publish debug (exit=${exit_code}) ==="
+            echo "pwd=$(pwd)"
+            echo "whoami=$(whoami || true)"
+            echo "github.repository=${{ github.repository }}"
+            echo "github.repository_owner=${{ github.repository_owner }}"
+            echo "github.actor=${{ github.actor }}"
+            echo "github.sha=${{ github.sha }}"
+            echo "PROTOCOL=${PROTOCOL:-<unset>}"
+            echo "IMAGE_BASE=${IMAGE_BASE:-<unset>}"
+            echo "VERSION=${VERSION:-<unset>}"
+            echo "COMPONENT=${COMPONENT:-<unset>}"
+            echo "PRIMARY_TAG=${PRIMARY_TAG:-<unset>}"
+            echo "STABLE_TAG=${STABLE_TAG:-<unset>}"
+            echo "PRIMARY_REF=${PRIMARY_TAG:-<unset>} -> ${COMPONENT:-<unset>}:application/wasm+component"
+            echo "STABLE_REF=${STABLE_TAG:-<unset>} -> ${COMPONENT:-<unset>}:application/wasm+component"
+            local image_owner
+            image_owner="$(echo "${IMAGE_BASE:-}" | cut -d/ -f2)"
+            echo "IMAGE_BASE_OWNER=${image_owner:-<unset>}"
+            echo "IMAGE_BASE_OWNER_MATCHES_REPO_OWNER=$([[ \"${image_owner:-}\" == \"${{ github.repository_owner }}\" ]] && echo yes || echo no)"
+            echo "COMPONENT_EXISTS=$(test -f "${COMPONENT}" && echo yes || echo no)"
+            echo "DOCKER_CONFIG=${DOCKER_CONFIG:-<unset>}"
+            echo "XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-<unset>}"
+            echo "ORAS_VERSION=$(oras version 2>/dev/null || echo '<oras unavailable>')"
+            echo "DOCKER_LOGIN_CONFIG_PRESENT=$(test -f "$HOME/.docker/config.json" && echo yes || echo no)"
+            echo "=== end debug ==="
+          }
+
+          on_err() {
+            local exit_code="$?"
+            dump_publish_debug "${exit_code}"
+            exit "${exit_code}"
+          }
+          trap on_err ERR
+
+          echo "Publishing ORAS artifacts:"
+          echo "  primary: ${PRIMARY_TAG}"
+          echo "  stable:  ${STABLE_TAG}"
+          echo "  source:  ${COMPONENT}:application/wasm+component"
 
           oras push "${PRIMARY_TAG}" \
             "${COMPONENT}:application/wasm+component" \

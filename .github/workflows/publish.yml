@@ -11,6 +11,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       RUSTFLAGS: -C link-arg=-fuse-ld=bfd
+      CARGO_INCREMENTAL: 0
+      CARGO_PROFILE_DEV_DEBUG: 0
+      CARGO_PROFILE_TEST_DEBUG: 0
     permissions:
       contents: read
     steps:
@@ -18,12 +21,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.91.0
-      - uses: Swatinem/rust-cache@v2
       - name: Lint & Test
         run: |
+          set -euxo pipefail
           cargo fmt --all -- --check
           cargo clippy --workspace --all-targets -- -D warnings
-          cargo build --workspace --all-features
+          # Free clippy artifacts before the heaviest compile/test pass.
+          cargo clean
           cargo test --workspace --all-features -- --nocapture
 
   publish:

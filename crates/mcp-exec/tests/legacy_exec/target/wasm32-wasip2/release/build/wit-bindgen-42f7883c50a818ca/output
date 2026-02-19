@@ -1,2 +1,0 @@
-cargo:rustc-link-lib=static=wit_bindgen_cabi0_50_0
-cargo:rustc-link-search=native=/projects/ai/greentic-ng/greentic-mcp/crates/mcp-exec/tests/legacy_exec/target/wasm32-wasip2/release/build/wit-bindgen-42f7883c50a818ca/out

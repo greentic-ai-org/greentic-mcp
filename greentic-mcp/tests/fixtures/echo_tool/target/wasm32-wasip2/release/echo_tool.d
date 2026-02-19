@@ -1,1 +1,0 @@
-/projects/ai/greentic-ng/greentic-mcp/greentic-mcp/tests/fixtures/echo_tool/target/wasm32-wasip2/release/echo_tool.wasm: /projects/ai/greentic-ng/greentic-mcp/greentic-mcp/tests/fixtures/echo_tool/src/lib.rs /projects/ai/greentic-ng/greentic-mcp/greentic-mcp/tests/fixtures/echo_tool/wit/tool.wit
