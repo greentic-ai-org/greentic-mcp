@@ -77,27 +77,6 @@ ensure_tool() {
   return 1
 }
 
-install_pre_push_hook() {
-  local git_dir=".git"
-  local hook="${git_dir}/hooks/pre-push"
-
-  [[ -d "$git_dir" ]] || return 0
-  if [[ -f "$hook" ]]; then
-    return 0
-  fi
-
-  cat >"$hook" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-ROOT="$(git rev-parse --show-toplevel)"
-exec "$ROOT/ci/local_check.sh"
-EOF
-  chmod +x "$hook"
-  echo "[info] Installed .git/hooks/pre-push to run ci/local_check.sh"
-}
-
-install_pre_push_hook
-
 step "Toolchain"
 if need cargo >/dev/null 2>&1; then
   cargo --version
