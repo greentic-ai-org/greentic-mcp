@@ -7,6 +7,8 @@ use wasmtime::component::{Component, Linker, ResourceTable};
 use wasmtime::{Engine, Store, Trap};
 use wasmtime_wasi::p2;
 use wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
+use wasmtime_wasi_http::{WasiHttpCtx, WasiHttpView};
+use wasmtime_wasi_tls::{LinkOptions, WasiTls, WasiTlsCtx, WasiTlsCtxBuilder};
 
 use crate::retry;
 use crate::types::{McpError, ToolInput, ToolOutput, ToolRef};
@@ -141,6 +143,25 @@ fn invoke_blocking(
         )))
     })?;
 
+    // Add wasi-tls types and turn on the feature in linker
+    let mut opts = LinkOptions::default();
+    opts.tls(true);
+    wasmtime_wasi_tls::add_to_linker(&mut linker, &mut opts, |h: &mut WasiState| {
+        WasiTls::new(&h.wasi_tls_ctx, &mut h.table)
+    })
+    .map_err(|err| {
+        InvocationFailure::fatal(McpError::Internal(format!(
+            "failed to link TLS helper: {err}"
+        )))
+    })?;
+
+    // Add wasi-http types and turn on the feature in linker
+    wasmtime_wasi_http::add_only_http_to_linker_sync(&mut linker).map_err(|err| {
+        InvocationFailure::fatal(McpError::Internal(format!(
+            "failed to link HTTP helper: {err}"
+        )))
+    })?;
+
     let pre = linker.instantiate_pre(&component).map_err(|err| {
         InvocationFailure::fatal(McpError::ExecutionFailed(format!(
             "failed to prepare `{}`: {err}",
@@ -188,6 +209,8 @@ fn classify(err: wasmtime::Error, tool: &ToolRef) -> InvocationFailure {
 
 struct WasiState {
     ctx: WasiCtx,
+    wasi_tls_ctx: WasiTlsCtx,
+    wasi_http_ctx: WasiHttpCtx,
     table: ResourceTable,
 }
 
@@ -199,6 +222,8 @@ impl WasiState {
         builder.allow_blocking_current_thread(true);
         Self {
             ctx: builder.build(),
+            wasi_tls_ctx: WasiTlsCtxBuilder::new().build(),
+            wasi_http_ctx: WasiHttpCtx::new(),
             table: ResourceTable::new(),
         }
     }
@@ -210,5 +235,15 @@ impl WasiView for WasiState {
             ctx: &mut self.ctx,
             table: &mut self.table,
         }
+    }
+}
+
+impl WasiHttpView for WasiState {
+    fn ctx(&mut self) -> &mut WasiHttpCtx {
+        &mut self.wasi_http_ctx
+    }
+
+    fn table(&mut self) -> &mut ResourceTable {
+        &mut self.table
     }
 }

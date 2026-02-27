@@ -114,10 +114,9 @@ fn try_describe_v1(name: &str, cfg: &ExecConfig) -> Result<Option<Value>> {
 
     let mut config = Config::new();
     config.wasm_component_model(true);
-    config.async_support(false);
     config.epoch_interruption(true);
 
-    let engine = Engine::new(&config)?;
+    let engine = Engine::new(&config).map_err(|err| anyhow::anyhow!(err.to_string()))?;
     let component = match Component::from_binary(&engine, verified.resolved.bytes.as_ref()) {
         Ok(component) => component,
         Err(_) => return Ok(None),
@@ -144,11 +143,13 @@ fn try_describe_v1(name: &str, cfg: &ExecConfig) -> Result<Option<Value>> {
             if msg.contains("unknown export") {
                 return Ok(None);
             }
-            return Err(err);
+            return Err(anyhow::anyhow!(err.to_string()));
         }
     };
 
-    let (raw,) = func.call(&mut store, ())?;
+    let (raw,) = func
+        .call(&mut store, ())
+        .map_err(|err| anyhow::anyhow!(err.to_string()))?;
     let value: Value =
         serde_json::from_str(&raw).with_context(|| "describe-json returned invalid JSON")?;
     Ok(Some(value))

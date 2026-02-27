@@ -88,7 +88,7 @@ fn run_router(cmd: RouterCommand, verbose: bool) -> Result<()> {
         eprintln!("loading component {}", cmd.router.display());
     }
     let component = Component::from_file(&engine, &cmd.router)
-        .with_context(|| format!("loading component {}", cmd.router.display()))?;
+        .map_err(|err| anyhow!("loading component {}: {}", cmd.router.display(), err))?;
     if verbose {
         eprintln!("component loaded");
     }
@@ -129,12 +129,13 @@ fn invoke_router(
     }
     let mut linker = Linker::new(&engine);
     linker.allow_shadowing(true);
-    add_wasi_to_linker(&mut linker).context("linking wasi preview2 imports")?;
+    add_wasi_to_linker(&mut linker)
+        .map_err(|err| anyhow!("linking wasi preview2 imports: {}", err))?;
     runner_host_http::add_runner_host_http_to_linker(&mut linker, |state: &mut StoreState| state)
-        .context("linking runner host http")?;
+        .map_err(|err| anyhow!("linking runner host http: {}", err))?;
     runner_host_kv::add_runner_host_kv_to_linker(&mut linker, |state: &mut StoreState| state)
-        .context("linking runner host kv")?;
-    add_secrets_to_linker(&mut linker).context("linking secrets host")?;
+        .map_err(|err| anyhow!("linking runner host kv: {}", err))?;
+    add_secrets_to_linker(&mut linker).map_err(|err| anyhow!("linking secrets host: {}", err))?;
 
     let http_enabled = cmd.enable_http && !cmd.list_tools;
     if verbose {
@@ -163,7 +164,9 @@ fn invoke_router(
         if verbose {
             eprintln!("calling list-tools");
         }
-        let tools = router_iface.call_list_tools(&mut store)?;
+        let tools = router_iface
+            .call_list_tools(&mut store)
+            .map_err(|err| anyhow!(err.to_string()))?;
         if verbose {
             eprintln!("list-tools returned {} entries", tools.len());
         }
@@ -181,7 +184,9 @@ fn invoke_router(
         .as_deref()
         .ok_or_else(|| anyhow!("--tool/--operation is required unless --list-tools is set"))?;
 
-    let result = router_iface.call_call_tool(&mut store, tool, &args_json)?;
+    let result = router_iface
+        .call_call_tool(&mut store, tool, &args_json)
+        .map_err(|err| anyhow!(err.to_string()))?;
 
     let json = match result {
         Ok(resp) => router::render_response(&resp),
@@ -223,8 +228,7 @@ fn load_input(inline: Option<String>, file: Option<PathBuf>) -> Result<String> {
 fn build_engine() -> Result<Engine> {
     let mut config = Config::new();
     config.wasm_component_model(true);
-    config.async_support(false);
     // Epoch interruption is disabled here; caller-driven timeouts are enforced by a worker thread.
     config.epoch_interruption(false);
-    Engine::new(&config).context("initializing wasmtime engine")
+    Engine::new(&config).map_err(|err| anyhow!("initializing wasmtime engine: {}", err))
 }
