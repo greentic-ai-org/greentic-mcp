@@ -116,7 +116,8 @@ fn try_describe_v1(name: &str, cfg: &ExecConfig) -> Result<Option<Value>> {
     config.wasm_component_model(true);
     config.epoch_interruption(true);
 
-    let engine = Engine::new(&config).map_err(|err| ExecError::runner(name, RunnerError::from(err)))?;
+    let engine =
+        Engine::new(&config).map_err(|err| ExecError::runner(name, RunnerError::from(err)))?;
     let component = match Component::from_binary(&engine, verified.resolved.bytes.as_ref()) {
         Ok(component) => component,
         Err(_) => return Ok(None),
