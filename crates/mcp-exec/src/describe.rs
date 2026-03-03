@@ -3,7 +3,7 @@ use greentic_types::{SecretFormat, SecretKey, SecretRequirement, SecretScope};
 use serde_json::Value;
 use tracing::warn;
 
-use crate::{ExecConfig, ExecError, ExecRequest, exec};
+use crate::{ExecConfig, ExecError, ExecRequest, RunnerError, exec};
 
 #[cfg(feature = "describe-v1")]
 const DESCRIBE_INTERFACE: &str = "greentic:component/describe-v1@1.0.0";
@@ -116,7 +116,7 @@ fn try_describe_v1(name: &str, cfg: &ExecConfig) -> Result<Option<Value>> {
     config.wasm_component_model(true);
     config.epoch_interruption(true);
 
-    let engine = Engine::new(&config).map_err(|err| anyhow::anyhow!(err.to_string()))?;
+    let engine = Engine::new(&config).map_err(|err| ExecError::runner(name, RunnerError::from(err)))?;
     let component = match Component::from_binary(&engine, verified.resolved.bytes.as_ref()) {
         Ok(component) => component,
         Err(_) => return Ok(None),
@@ -143,13 +143,13 @@ fn try_describe_v1(name: &str, cfg: &ExecConfig) -> Result<Option<Value>> {
             if msg.contains("unknown export") {
                 return Ok(None);
             }
-            return Err(anyhow::anyhow!(err.to_string()));
+            return Err(ExecError::runner(name, RunnerError::from(err)).into());
         }
     };
 
     let (raw,) = func
         .call(&mut store, ())
-        .map_err(|err| anyhow::anyhow!(err.to_string()))?;
+        .map_err(|err| ExecError::runner(name, RunnerError::from(err)))?;
     let value: Value =
         serde_json::from_str(&raw).with_context(|| "describe-json returned invalid JSON")?;
     Ok(Some(value))
