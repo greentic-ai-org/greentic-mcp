@@ -13,6 +13,8 @@ use wasmtime_wasi::{
     ResourceTable, WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView,
     p2::add_to_linker_sync as add_wasi_to_linker,
 };
+use wasmtime_wasi_http::{WasiHttpCtx, WasiHttpView};
+use wasmtime_wasi_tls::{LinkOptions, WasiTls, WasiTlsCtx, WasiTlsCtxBuilder};
 
 use crate::ExecRequest;
 use crate::config::{DynSecretsStore, RuntimePolicy};
@@ -45,7 +47,6 @@ impl DefaultRunner {
     pub fn new(runtime: &RuntimePolicy) -> Result<Self, RunnerError> {
         let mut config = wasmtime::Config::new();
         config.wasm_component_model(true);
-        config.async_support(false);
         // Epoch interruption lets us wire wallclock enforcement without embedding async support.
         config.epoch_interruption(true);
         if runtime.fuel.is_some() {
@@ -117,6 +118,15 @@ fn run_sync(
     let mut linker = Linker::new(&engine);
     linker.allow_shadowing(true);
     add_wasi_to_linker(&mut linker).map_err(|err| RunnerError::Internal(err.to_string()))?;
+
+    // Add wasi-tls types and turn on the feature in linker
+    let mut opts = LinkOptions::default();
+    opts.tls(true);
+    wasmtime_wasi_tls::add_to_linker(&mut linker, &mut opts, |h: &mut StoreState| h.wasi_tls())?;
+
+    // Add wasi-http types and turn on the feature in linker
+    wasmtime_wasi_http::add_only_http_to_linker_sync(&mut linker)?;
+
     runner_host_http::add_runner_host_http_to_linker(&mut linker, |state: &mut StoreState| state)
         .map_err(|err| RunnerError::Internal(err.to_string()))?;
     runner_host_kv::add_runner_host_kv_to_linker(&mut linker, |state: &mut StoreState| state)
@@ -138,7 +148,9 @@ fn run_sync(
         &mut store,
         &request.action,
         &args_json,
-    )? {
+    )
+    .map_err(|e| RunnerError::Internal(e.to_string()))?
+    {
         return Ok(value);
     }
 
@@ -197,6 +209,8 @@ pub struct StoreState {
     tenant: Option<TenantCtx>,
     table: ResourceTable,
     wasi_ctx: WasiCtx,
+    wasi_tls_ctx: WasiTlsCtx,
+    wasi_http_ctx: WasiHttpCtx,
 }
 
 // The Wasmtime store is confined to a single worker thread for each execution.
@@ -215,6 +229,8 @@ impl StoreState {
             builder.inherit_network().allow_ip_name_lookup(true);
         }
         let wasi_ctx = builder.build();
+        let wasi_tls_ctx = WasiTlsCtxBuilder::new().build();
+        let wasi_http_ctx = WasiHttpCtx::new();
         Self {
             http_enabled,
             http_client: None,
@@ -222,7 +238,21 @@ impl StoreState {
             tenant,
             table: ResourceTable::new(),
             wasi_ctx,
+            wasi_tls_ctx,
+            wasi_http_ctx,
         }
+    }
+
+    pub fn table_mut(&mut self) -> &mut ResourceTable {
+        &mut self.table
+    }
+
+    pub fn wasi_tls(&mut self) -> WasiTls<'_> {
+        WasiTls::new(&self.wasi_tls_ctx, &mut self.table)
+    }
+
+    pub fn wasi_http_ctx_mut(&mut self) -> &mut WasiHttpCtx {
+        &mut self.wasi_http_ctx
     }
 
     fn http_client(&mut self) -> Result<&reqwest::blocking::Client, String> {
@@ -375,6 +405,16 @@ impl WasiView for StoreState {
             ctx: &mut self.wasi_ctx,
             table: &mut self.table,
         }
+    }
+}
+
+impl WasiHttpView for StoreState {
+    fn ctx(&mut self) -> &mut WasiHttpCtx {
+        &mut self.wasi_http_ctx
+    }
+
+    fn table(&mut self) -> &mut ResourceTable {
+        &mut self.table
     }
 }
 

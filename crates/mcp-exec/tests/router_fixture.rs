@@ -96,7 +96,6 @@ fn router_lists_tools() {
 
     let mut config = wasmtime::Config::new();
     config.wasm_component_model(true);
-    config.async_support(false);
     let engine = Engine::new(&config).expect("engine");
     let component =
         wasmtime::component::Component::from_file(&engine, &wasm_path).expect("component");

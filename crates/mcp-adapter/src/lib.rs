@@ -1020,7 +1020,6 @@ mod tests {
         fn new(wasm_path: &PathBuf) -> Result<Self, String> {
             let mut config = wasmtime::Config::new();
             config.wasm_component_model(true);
-            config.async_support(false);
             let engine = Engine::new(&config).map_err(|err| err.to_string())?;
             let component = wasmtime::component::Component::from_file(&engine, wasm_path)
                 .map_err(|err| err.to_string())?;

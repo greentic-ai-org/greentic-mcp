@@ -33,7 +33,7 @@ pub(crate) fn try_call_tool_router(
             {
                 return Ok(None);
             }
-            return Err(err);
+            return Err(anyhow::anyhow!(err.to_string()));
         }
     };
 
@@ -43,7 +43,7 @@ pub(crate) fn try_call_tool_router(
     {
         Ok(Ok(resp)) => resp,
         Ok(Err(err)) => return Ok(Some(tool_error_to_value(tool, err))),
-        Err(err) => return Err(err),
+        Err(err) => return Err(anyhow::anyhow!(err.to_string())),
     };
 
     Ok(Some(render_response(&response)))
@@ -65,11 +65,14 @@ pub(crate) fn try_list_tools_router(
             {
                 return Ok(None);
             }
-            return Err(err);
+            return Err(anyhow::anyhow!(err.to_string()));
         }
     };
 
-    let tools = router.wasix_mcp_router().call_list_tools(&mut *store)?;
+    let tools = router
+        .wasix_mcp_router()
+        .call_list_tools(&mut *store)
+        .map_err(|err| anyhow::anyhow!(err.to_string()))?;
     Ok(Some(tools))
 }
 
