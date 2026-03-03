@@ -15,10 +15,10 @@ world = "adapter"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+greentic-interfaces-guest.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 thiserror.workspace = true
-greentic-interfaces-guest.workspace = true
 wit-bindgen.workspace = true
 
 [dev-dependencies]
